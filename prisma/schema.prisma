@@ -1,0 +1,193 @@
+// generator and datasource configuration
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// User Roles within the Accounting Firm
+enum Role {
+  FIRM_ADMIN       // CPA Firm owner / Principal partner
+  ACCOUNTANT       // Staff accountant
+  CLIENT_USER      // End-client taxpayer (business owner or individual)
+}
+
+// 1. Unified Authentication System
+model User {
+  id              String        @id @default(cuid())
+  email           String        @unique
+  passwordHash    String
+  name            String
+  role            Role          @default(CLIENT_USER)
+  phone           String?
+  isActive        Boolean       @default(true)
+  
+  // Relations
+  clientProfile   Client?       @relation("UserToClient") // Present if role == CLIENT_USER
+  assignedTasks   Task[]        @relation("TaskAssignee")
+  createdTasks    Task[]        @relation("TaskCreator")
+  chatMessages    ChatMessage[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([role])
+}
+
+// 2. Client Profiles (Taxpayers managed by the Firm)
+model Client {
+  id                  String        @id @default(cuid())
+  userId              String        @unique
+  user                User          @relation("UserToClient", fields: [userId], references: [id], onDelete: Cascade)
+  companyName         String?       // e.g., "Miami Plumbing LLC" (or null if individual taxpayer)
+  taxType             String        @default("1120S") // 1040, 1120S, 1065, 1120, etc.
+  taxYear             Int           @default(2026)
+  status              String        @default("ONBOARDING") // ONBOARDING, MISSING_DOCS, IN_PREPARATION, REVIEW, COMPLETED
+  assignedAccountantId String?
+  
+  // Relations
+  documents           Document[]
+  appointments        Appointment[]
+  tasks               Task[]
+  
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([status])
+}
+
+// 3. Intelligent Document Classification & Extract (OCR)
+model Document {
+  id               String          @id @default(cuid())
+  clientId         String?
+  client           Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  name             String
+  url              String          // File URL (DO Spaces / Cloud storage)
+  fileType         String          // PDF, PNG, JPG
+  fileSize         Int
+  taxYear          Int             @default(2026)
+  category         String          @default("UNCLASSIFIED") // W2, 1099-NEC, Bank_Statement, Receipt, Tax_Notice
+  status           String          @default("UPLOADED") // UPLOADED, OCR_PROCESSING, REVIEW_REQUIRED, VALIDATED
+  extractedText    String?         @db.Text // Full OCR transcript
+  aiSummary        String?         @db.Text // Quick OpenAI TL;DR
+  confidenceScore  Float           @default(0.0)
+  validationErrors String?         @db.Text // AI flagged errors (e.g. missing signature)
+  
+  chunks           DocumentChunk[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+}
+
+// 4. Document Chunks for RAG Tax Planning
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String   @db.Text
+  embedding  Json?    // Array representation of embeddings (fallback or mapped to pgvector)
+  createdAt  DateTime @default(now())
+
+  @@index([documentId])
+}
+
+// 5. Tasks / Onboarding Checklists
+model Task {
+  id              String        @id @default(cuid())
+  clientId        String
+  client          Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?       @db.Text
+  status          String        @default("TODO") // TODO, IN_PROGRESS, CLIENT_PENDING, REVIEW, COMPLETED
+  priority        String        @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate         DateTime?
+  
+  assignedToId    String?
+  assignedTo      User?         @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdById     String
+  createdBy       User          @relation("TaskCreator", fields: [createdById], references: [id])
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+}
+
+// 6. Marketing Leads & CRM (Integrated Apify & Web forms)
+model Lead {
+  id           String        @id @default(cuid())
+  name         String
+  email        String
+  company      String?
+  phone        String?
+  source       String        @default("WEBSITE") // WEBSITE, WHATSAPP, SMS, APIFY
+  status       String        @default("NEW") // NEW, CONTACTED, WON, LOST
+  notes        String?       @db.Text
+  aiDossier    String?       @db.Text
+  
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status])
+}
+
+model Appointment {
+  id        String   @id @default(cuid())
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  clientId  String?
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title     String
+  startTime DateTime
+  endTime   DateTime
+  status    String   @default("SCHEDULED") // SCHEDULED, COMPLETED, CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([clientId])
+}
+
+// 7. Secure Chat Messages & Escalations
+model ChatMessage {
+  id            String   @id @default(cuid())
+  senderId      String?  // Null if generated by AI
+  sender        User?    @relation(fields: [senderId], references: [id])
+  channel       String   @default("PORTAL") // PORTAL, WHATSAPP, SMS
+  content       String   @db.Text
+  isAiGenerated Boolean  @default(false)
+  needsHuman    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+// 8. Global Settings & API Configuration for Firm
+model Settings {
+  id              String   @id @default("global")
+  firmName        String   @default("Datalazo Ledger Services")
+  senderName      String   @default("Principal Accountant")
+  senderEmail     String   @default("office@datalazo.net")
+  resendApiKey    String?
+  whatsappApiKey  String?
+  twilioSid       String?
+  twilioToken     String?
+  googleCalUrl    String?
+  updatedAt       DateTime @updatedAt
+}
+
+// 9. Token Credits ROI Tracker
+model TokenUsage {
+  id               String   @id @default(cuid())
+  feature          String   // "OCR", "RAG_CHAT", "VOICE", "OUTREACH"
+  model            String   // "gpt-4o", "text-embedding-3-small"
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  cost             Float    @default(0.0)
+  createdAt        DateTime @default(now())
+}
