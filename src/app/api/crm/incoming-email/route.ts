@@ -261,13 +261,8 @@ export async function POST(req: Request) {
         }
       }
 
-      let status = aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
-      let validationErrors = aiResult.validationErrors;
-
-      if (convertedFileType.toUpperCase() !== 'PDF') {
-        status = 'REVIEW_REQUIRED';
-        validationErrors = `Unsupported file format (${convertedFileType}). The vault requires documents to be in PDF format. Please convert this file to PDF.`;
-      }
+      const status = aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
+      const validationErrors = aiResult.validationErrors;
 
       const doc = await prisma.document.create({
         data: {

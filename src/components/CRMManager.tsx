@@ -271,21 +271,51 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
   };
 
   const handleDownloadSelected = async () => {
-    const docNames = selectedConsoleDocs.map(docId => {
+    const validDocs = selectedConsoleDocs.filter(docId => {
+      const doc = consoleDocs.find(d => d.id === docId);
+      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
+      return isPdf;
+    });
+
+    if (validDocs.length === 0) {
+      alert("No PDF files selected for download. Non-PDF files are excluded from batch operations.");
+      return;
+    }
+
+    if (validDocs.length < selectedConsoleDocs.length) {
+      alert(`Skipping ${selectedConsoleDocs.length - validDocs.length} non-PDF document(s) from the batch download.`);
+    }
+
+    const docNames = validDocs.map(docId => {
       const doc = consoleDocs.find(d => d.id === docId);
       return doc ? doc.name : 'document.pdf';
     });
     const clientName = selectedConsoleClient ? `${selectedConsoleClient.user.name} Documents.zip` : 'documents.zip';
-    await triggerFolderDownloadAsZip(selectedConsoleDocs, docNames, clientName);
+    await triggerFolderDownloadAsZip(validDocs, docNames, clientName);
   };
 
   const handleMergeSelected = async () => {
-    const docNames = selectedConsoleDocs.map(docId => {
+    const validDocs = selectedConsoleDocs.filter(docId => {
+      const doc = consoleDocs.find(d => d.id === docId);
+      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
+      return isPdf;
+    });
+
+    if (validDocs.length === 0) {
+      alert("No PDF files selected for merging. Non-PDF files are excluded from batch operations.");
+      return;
+    }
+
+    if (validDocs.length < selectedConsoleDocs.length) {
+      alert(`Skipping ${selectedConsoleDocs.length - validDocs.length} non-PDF document(s) from the merge.`);
+    }
+
+    const docNames = validDocs.map(docId => {
       const doc = consoleDocs.find(d => d.id === docId);
       return doc ? doc.name : 'document.pdf';
     });
     const clientName = selectedConsoleClient ? `${selectedConsoleClient.user.name} Merged.pdf` : 'merged.pdf';
-    await triggerMergeDocuments(selectedConsoleDocs, docNames, clientName);
+    await triggerMergeDocuments(validDocs, docNames, clientName);
   };
 
   // Drag and Drop Handlers

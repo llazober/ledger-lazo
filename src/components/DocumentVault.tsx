@@ -243,7 +243,22 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   };
 
   const handleDownloadSelectedVault = async () => {
-    const docNames = selectedVaultDocs.map(docId => {
+    const validDocs = selectedVaultDocs.filter(docId => {
+      const doc = docs.find(d => d.id === docId);
+      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
+      return isPdf;
+    });
+
+    if (validDocs.length === 0) {
+      alert("No PDF files selected for download. Non-PDF files are excluded from batch operations.");
+      return;
+    }
+
+    if (validDocs.length < selectedVaultDocs.length) {
+      alert(`Skipping ${selectedVaultDocs.length - validDocs.length} non-PDF document(s) from the batch download.`);
+    }
+
+    const docNames = validDocs.map(docId => {
       const doc = docs.find(d => d.id === docId);
       return doc ? doc.name : 'document.pdf';
     });
@@ -252,11 +267,26 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       const client = clients.find(c => c.id === selectedClientId);
       if (client) archiveName = `${client.name}_tax_documents.zip`;
     }
-    await triggerFolderDownloadAsZip(selectedVaultDocs, docNames, archiveName);
+    await triggerFolderDownloadAsZip(validDocs, docNames, archiveName);
   };
 
   const handleMergeSelectedVault = async () => {
-    const docNames = selectedVaultDocs.map(docId => {
+    const validDocs = selectedVaultDocs.filter(docId => {
+      const doc = docs.find(d => d.id === docId);
+      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
+      return isPdf;
+    });
+
+    if (validDocs.length === 0) {
+      alert("No PDF files selected for merging. Non-PDF files are excluded from batch operations.");
+      return;
+    }
+
+    if (validDocs.length < selectedVaultDocs.length) {
+      alert(`Skipping ${selectedVaultDocs.length - validDocs.length} non-PDF document(s) from the merge.`);
+    }
+
+    const docNames = validDocs.map(docId => {
       const doc = docs.find(d => d.id === docId);
       return doc ? doc.name : 'document.pdf';
     });
@@ -265,7 +295,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       const client = clients.find(c => c.id === selectedClientId);
       if (client) outputName = `${client.name}_merged_tax_documents.pdf`;
     }
-    await triggerMergeDocuments(selectedVaultDocs, docNames, outputName);
+    await triggerMergeDocuments(validDocs, docNames, outputName);
   };
   
   // RAG Chat States
