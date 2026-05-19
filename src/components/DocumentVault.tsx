@@ -43,6 +43,51 @@ const readFileAsBase64 = (file: File): Promise<string> => {
   });
 };
 
+async function triggerFileDownloadWithSavePicker(docId: string, suggestedName: string) {
+  const url = `/accounting/api/crm/document/download?docId=${docId}`;
+  
+  if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const blob = await response.blob();
+
+      const extension = suggestedName.split('.').pop()?.toLowerCase() || 'pdf';
+      let mimeType = 'application/octet-stream';
+      if (extension === 'pdf') mimeType = 'application/pdf';
+      else if (extension === 'jpg' || extension === 'jpeg') mimeType = 'image/jpeg';
+      else if (extension === 'png') mimeType = 'image/png';
+
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName: suggestedName,
+        types: [{
+          description: `${extension.toUpperCase()} File`,
+          accept: {
+            [mimeType]: [`.${extension}`]
+          }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return;
+      }
+      console.warn("showSaveFilePicker failed or was aborted. Falling back to standard download.", err);
+    }
+  }
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', suggestedName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 export default function DocumentVault({ initialDocs, clients }: DocumentVaultProps) {
   const [docs, setDocs] = useState<Document[]>(initialDocs);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -60,14 +105,11 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
 
   const handleDownloadSelectedVault = () => {
     selectedVaultDocs.forEach((docId, index) => {
+      const doc = docs.find(d => d.id === docId);
+      const name = doc ? doc.name : 'document.pdf';
       setTimeout(() => {
-        const link = document.createElement('a');
-        link.href = `/accounting/api/crm/document/download?docId=${docId}`;
-        link.setAttribute('download', '');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, index * 400);
+        triggerFileDownloadWithSavePicker(docId, name);
+      }, index * 600);
     });
   };
   
@@ -442,13 +484,13 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       >
                         👁️
                       </a>
-                      <a 
-                        href={`/accounting/api/crm/document/download?docId=${doc.id}`}
+                      <button 
+                        onClick={() => triggerFileDownloadWithSavePicker(doc.id, doc.name)}
                         className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-[#00f0ff]/5 hover:bg-[#00f0ff]/15 px-2 py-1 rounded transition-all font-semibold"
                         title="Download file"
                       >
                         📥
-                      </a>
+                      </button>
                     </div>
                     
                     <button
@@ -514,12 +556,12 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between items-center">
                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">File Content Preview</span>
-                  <a
-                    href={`/accounting/api/crm/document/download?docId=${activeDoc.id}`}
+                  <button
+                    onClick={() => triggerFileDownloadWithSavePicker(activeDoc.id, activeDoc.name)}
                     className="text-[9px] text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center gap-1 bg-cyan-900/20 px-2.5 py-1 rounded border border-cyan-500/20 transition-all hover:scale-105"
                   >
                     📥 Download Document
-                  </a>
+                  </button>
                 </div>
                 <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 min-h-[140px] max-h-[200px] overflow-y-auto text-slate-800 font-mono text-[10px] leading-relaxed whitespace-pre-wrap shadow-inner relative select-text">
                   <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-sans font-bold select-none">

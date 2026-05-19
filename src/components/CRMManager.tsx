@@ -33,6 +33,51 @@ interface Lead {
   createdAt: string;
 }
 
+async function triggerFileDownloadWithSavePicker(docId: string, suggestedName: string) {
+  const url = `/accounting/api/crm/document/download?docId=${docId}`;
+  
+  if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const blob = await response.blob();
+
+      const extension = suggestedName.split('.').pop()?.toLowerCase() || 'pdf';
+      let mimeType = 'application/octet-stream';
+      if (extension === 'pdf') mimeType = 'application/pdf';
+      else if (extension === 'jpg' || extension === 'jpeg') mimeType = 'image/jpeg';
+      else if (extension === 'png') mimeType = 'image/png';
+
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName: suggestedName,
+        types: [{
+          description: `${extension.toUpperCase()} File`,
+          accept: {
+            [mimeType]: [`.${extension}`]
+          }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return;
+      }
+      console.warn("showSaveFilePicker failed or was aborted. Falling back to standard download.", err);
+    }
+  }
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', suggestedName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 interface CRMManagerProps {
   initialLeads: Lead[];
   initialClients: Client[];
@@ -84,14 +129,11 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
 
   const handleDownloadSelected = () => {
     selectedConsoleDocs.forEach((docId, index) => {
+      const doc = consoleDocs.find(d => d.id === docId);
+      const name = doc ? doc.name : 'document.pdf';
       setTimeout(() => {
-        const link = document.createElement('a');
-        link.href = `/accounting/api/crm/document/download?docId=${docId}`;
-        link.setAttribute('download', '');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, index * 400);
+        triggerFileDownloadWithSavePicker(docId, name);
+      }, index * 600);
     });
   };
 
@@ -735,13 +777,13 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                         >
                           👁️ Preview
                         </a>
-                        <a 
-                          href={`/accounting/api/crm/document/download?docId=${doc.id}`}
+                        <button 
+                          onClick={() => triggerFileDownloadWithSavePicker(doc.id, doc.name)}
                           className="px-2.5 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/20 text-[11px] font-bold rounded-lg transition-all"
                           title="Download file"
                         >
                           📥 Download
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ))}
