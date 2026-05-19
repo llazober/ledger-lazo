@@ -49,6 +49,66 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   
+  // Client Tax Console Modal States
+  const [selectedConsoleClient, setSelectedConsoleClient] = useState<Client | null>(null);
+  const [consoleDocs, setConsoleDocs] = useState<any[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleOpenConsole = async (client: Client) => {
+    setSelectedConsoleClient(client);
+    setIsLoadingDocs(true);
+    setConsoleDocs([]);
+    try {
+      const res = await fetch(`/accounting/api/crm/client/documents?clientId=${client.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setConsoleDocs(data.documents);
+      }
+    } catch (err) {
+      console.error("Error fetching client documents:", err);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  };
+
+  const handleUploadTaxReturn = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedConsoleClient) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('clientId', selectedConsoleClient.id);
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/accounting/api/crm/client/upload-return', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Completed tax return uploaded successfully! Client status updated to 'In Review'.");
+        
+        // Update client status in local state
+        setClients(prev => prev.map(c => c.id === selectedConsoleClient.id ? { ...c, status: 'REVIEW' } : c));
+        
+        // Refresh console documents list
+        const refreshedRes = await fetch(`/accounting/api/crm/client/documents?clientId=${selectedConsoleClient.id}`);
+        const refreshedData = await refreshedRes.json();
+        if (refreshedData.success) {
+          setConsoleDocs(refreshedData.documents);
+        }
+      } else {
+        alert("Upload failed: " + data.error);
+      }
+    } catch (err: any) {
+      alert("Error uploading tax return: " + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+  
   // Form State for Mock Lead creation
   const [newLeadForm, setNewLeadForm] = useState({
     name: '',
@@ -292,13 +352,18 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                 <div className="flex-1 space-y-3 p-1">
                   {colClients.map(client => (
                     <div key={client.id} className="glass p-4 space-y-3 glass-card-hover text-left flex flex-col justify-between">
-                      <div>
+                      <div className="cursor-pointer group/card" onClick={() => handleOpenConsole(client)}>
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase">{client.taxType}</span>
                           <span className="text-[10px] text-slate-500 font-semibold">TY {client.taxYear}</span>
                         </div>
-                        <h4 className="font-bold text-white mt-2 leading-snug">{client.user.name}</h4>
+                        <h4 className="font-bold text-white mt-2 leading-snug group-hover/card:text-[#00f0ff] transition-all flex items-center gap-1">
+                          {client.user.name} <span className="opacity-0 group-hover/card:opacity-100 text-[10px]">⚙️</span>
+                        </h4>
                         <p className="text-[10px] text-slate-400 font-medium truncate mt-1">{client.companyName || 'Individual Taxpayer'}</p>
+                        <span className="text-[9px] text-[#00f0ff] font-bold block mt-2.5 bg-[#00f0ff]/5 border border-[#00f0ff]/10 rounded px-2 py-0.5 w-max hover:bg-[#00f0ff]/10 transition-all">
+                          📂 Tax Console
+                        </span>
                       </div>
 
                       <div className="pt-3 border-t border-white/5 flex flex-col gap-2 mt-4">
@@ -548,6 +613,107 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Client Tax Console Modal */}
+      {selectedConsoleClient && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="glass w-full max-w-xl p-6 space-y-5 border border-[#00f0ff]/20 relative shadow-[0_0_50px_rgba(0,240,255,0.1)] text-left">
+            
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-white/5 pb-4">
+              <div>
+                <span className="text-[10px] text-cyan-400 font-extrabold uppercase tracking-wider block mb-1">
+                  Client Tax Console
+                </span>
+                <h3 className="text-xl font-bold tracking-tight text-white">{selectedConsoleClient.user.name}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {selectedConsoleClient.companyName || 'Individual Taxpayer'} • {selectedConsoleClient.taxType} (TY {selectedConsoleClient.taxYear})
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedConsoleClient(null)}
+                className="text-slate-400 hover:text-white font-extrabold text-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Document List */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Uploaded Client Documents
+              </h4>
+              
+              {isLoadingDocs ? (
+                <div className="p-4 text-center text-slate-500 text-xs animate-pulse">
+                  Loading files from vault...
+                </div>
+              ) : consoleDocs.length === 0 ? (
+                <div className="p-4 text-center border border-dashed border-white/5 rounded-xl text-slate-500 text-xs">
+                  No documents uploaded for this client yet.
+                </div>
+              ) : (
+                <div className="divide-y divide-white/5 max-h-[180px] overflow-y-auto pr-1 border border-white/5 rounded-xl bg-[#0a0a0c]/40">
+                  {consoleDocs.map(doc => (
+                    <div key={doc.id} className="p-3 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-semibold text-white block truncate max-w-[280px]">{doc.name}</span>
+                        <div className="flex gap-2 items-center text-[10px] text-slate-500 mt-0.5">
+                          <span className="bg-white/5 px-1.5 py-0.5 rounded font-black text-slate-400 uppercase text-[9px]">{doc.category}</span>
+                          <span>•</span>
+                          <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                        </div>
+                      </div>
+                      
+                      <a 
+                        href={`/accounting/api/crm/document/download?docId=${doc.id}`}
+                        className="px-3 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/20 text-[11px] font-bold rounded-lg transition-all"
+                        title="Download file"
+                      >
+                        📥 Download
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* CPA File Upload Form (Completed Tax Return) */}
+            <div className="pt-4 border-t border-white/5 space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Preparer Actions
+              </h4>
+              
+              <div className="bg-[#050507] p-4 rounded-xl border border-white/5 relative">
+                {isUploading && (
+                  <div className="absolute inset-0 bg-black/70 rounded-xl flex items-center justify-center z-10">
+                    <span className="text-xs text-[#00f0ff] font-bold animate-pulse">Uploading finalized tax return...</span>
+                  </div>
+                )}
+                
+                <span className="text-[10px] text-slate-400 font-bold block mb-1">
+                  UPLOAD COMPLETED RETURN (PDF ONLY)
+                </span>
+                <p className="text-[10px] text-slate-500 leading-relaxed mb-3">
+                  Upload the finalized federal return. The system will save it in the client record and automatically advance this card to **In Review** stage.
+                </p>
+                
+                <label className="flex flex-col items-center justify-center border border-dashed border-white/10 hover:border-[#00f0ff]/40 bg-white/[0.01] hover:bg-white/[0.02] cursor-pointer py-4 rounded-xl transition-all">
+                  <span className="text-xs text-[#00f0ff] font-bold">📂 Click to Browse PDF</span>
+                  <span className="text-[9px] text-slate-500 mt-1">Accepts standard PDF files up to 10MB</span>
+                  <input 
+                    type="file" 
+                    accept="application/pdf"
+                    className="hidden" 
+                    onChange={handleUploadTaxReturn}
+                    disabled={isUploading}
+                  />
+                </label>
+              </div>
+            </div>
+            
           </div>
         </div>
       )}

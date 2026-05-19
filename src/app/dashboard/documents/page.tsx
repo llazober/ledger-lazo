@@ -11,6 +11,13 @@ export default async function DocumentsPage() {
       orderBy: { createdAt: 'desc' }
     });
 
+    const clients = await prisma.client.findMany({
+      include: {
+        user: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
     // Self-seeding mock documents for demo if empty
     if (docs.length === 0) {
       console.log("Documents table is empty, seeding mock CPA documents...");
@@ -72,9 +79,19 @@ export default async function DocumentsPage() {
       createdAt: doc.createdAt.toISOString()
     }));
 
+    const serializedClients = clients.map((client: any) => ({
+      id: client.id,
+      name: client.user.name,
+      companyName: client.companyName || null,
+      taxType: client.taxType
+    }));
+
     return (
       <DashboardWrapper>
-        <DocumentVault initialDocs={serializedDocs} />
+        <DocumentVault 
+          initialDocs={serializedDocs} 
+          clients={serializedClients}
+        />
       </DashboardWrapper>
     );
   } catch (error) {

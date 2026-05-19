@@ -4,6 +4,7 @@ import React, { useState, useTransition } from 'react';
 
 interface Document {
   id: string;
+  clientId?: string | null;
   name: string;
   url: string;
   fileType: string;
@@ -18,12 +19,21 @@ interface Document {
   createdAt: string;
 }
 
-interface DocumentVaultProps {
-  initialDocs: Document[];
+interface Client {
+  id: string;
+  name: string;
+  companyName?: string | null;
+  taxType: string;
 }
 
-export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
+interface DocumentVaultProps {
+  initialDocs: Document[];
+  clients: Client[];
+}
+
+export default function DocumentVault({ initialDocs, clients }: DocumentVaultProps) {
   const [docs, setDocs] = useState<Document[]>(initialDocs);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [activeDoc, setActiveDoc] = useState<Document | null>(initialDocs[0] || null);
   
@@ -56,11 +66,16 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
     });
   };
 
+  // Filter docs based on client selection
+  const filteredDocs = selectedClientId 
+    ? docs.filter(d => d.clientId === selectedClientId) 
+    : docs;
+
   // Stats
-  const totalDocs = docs.length;
-  const processedDocs = docs.filter(d => d.status === 'VALIDATED').length;
-  const processingDocs = docs.filter(d => d.status === 'OCR_PROCESSING').length;
-  const reviewRequiredDocs = docs.filter(d => d.status === 'REVIEW_REQUIRED').length;
+  const totalDocs = filteredDocs.length;
+  const processedDocs = filteredDocs.filter(d => d.status === 'VALIDATED').length;
+  const processingDocs = filteredDocs.filter(d => d.status === 'OCR_PROCESSING').length;
+  const reviewRequiredDocs = filteredDocs.filter(d => d.status === 'REVIEW_REQUIRED').length;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -284,13 +299,29 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
 
           {/* Document list table */}
           <div className="glass overflow-hidden flex-1 flex flex-col">
-            <div className="p-4 border-b border-white/5 bg-white/[0.01] flex justify-between items-center">
+            <div className="p-4 border-b border-white/5 bg-white/[0.01] flex justify-between items-center flex-wrap gap-3">
               <h3 className="font-bold text-xs uppercase tracking-wider text-slate-300">File Directory</h3>
-              <span className="text-[10px] text-slate-500 font-semibold">Select file to inspect details</span>
+              
+              {/* Client Filter Dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-500 font-bold uppercase">Filter Client:</span>
+                <select
+                  value={selectedClientId}
+                  onChange={(e) => setSelectedClientId(e.target.value)}
+                  className="bg-[#0f0f12] border border-white/10 focus:border-[#00f0ff] focus:outline-none rounded-lg text-slate-300 text-xs px-2 py-1 font-semibold transition-all"
+                >
+                  <option value="">All Clients</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.taxType})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             
             <div className="divide-y divide-white/5 overflow-y-auto max-h-[350px]">
-              {docs.map(doc => (
+              {filteredDocs.map(doc => (
                 <div 
                   key={doc.id}
                   onClick={() => setActiveDoc(doc)}
@@ -336,9 +367,9 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
                   </div>
                 </div>
               ))}
-              {docs.length === 0 && (
+              {filteredDocs.length === 0 && (
                 <div className="p-8 text-center text-slate-600 text-xs">
-                  Vault is empty. Drag a mock file (e.g. Google-W2.pdf) into the dropzone to start!
+                  No documents found for this client.
                 </div>
               )}
             </div>
@@ -386,16 +417,12 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between items-center">
                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">File Content Preview</span>
-                  {activeDoc.url && activeDoc.url !== '#' && (
-                    <a
-                      href={activeDoc.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[9px] text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center gap-1 bg-cyan-900/20 px-2 py-0.5 rounded border border-cyan-500/20 transition-all hover:scale-105"
-                    >
-                      👁️ Open Original Document
-                    </a>
-                  )}
+                  <a
+                    href={`/accounting/api/crm/document/download?docId=${activeDoc.id}`}
+                    className="text-[9px] text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center gap-1 bg-cyan-900/20 px-2.5 py-1 rounded border border-cyan-500/20 transition-all hover:scale-105"
+                  >
+                    📥 Download Document
+                  </a>
                 </div>
                 <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 min-h-[140px] max-h-[200px] overflow-y-auto text-slate-800 font-mono text-[10px] leading-relaxed whitespace-pre-wrap shadow-inner relative select-text">
                   <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-sans font-bold select-none">

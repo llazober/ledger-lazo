@@ -74,6 +74,7 @@ model Document {
   aiSummary        String?         @db.Text // Quick OpenAI TL;DR
   confidenceScore  Float           @default(0.0)
   validationErrors String?         @db.Text // AI flagged errors (e.g. missing signature)
+  fileData         String?         @db.Text // Base64 encoded file contents (for database storage)
   
   chunks           DocumentChunk[]
   createdAt        DateTime        @default(now())
