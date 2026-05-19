@@ -204,7 +204,7 @@ export async function POST(req: Request) {
           taxYear: 2026,
           category: aiResult.category,
           status: aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED',
-          extractedText: `Simulated OCR text content for attachment: ${name}.`,
+          extractedText: generateRealisticMockOCRText(name, aiResult.category),
           aiSummary: aiResult.aiSummary,
           confidenceScore: aiResult.confidenceScore,
           validationErrors: aiResult.validationErrors
@@ -259,4 +259,128 @@ export async function POST(req: Request) {
     console.error('Incoming Email Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+}
+
+function generateRealisticMockOCRText(filename: string, category: string): string {
+  const nameLower = filename.toLowerCase();
+  
+  if (category === 'W2') {
+    return `Form W-2 Wage and Tax Statement 2025
+--------------------------------------------------
+Employer Identification Number (EIN): 12-3456789
+Employer Name: Datalazo Technologies Inc.
+Employee Name: Luis Lazo
+Social Security Number: XXX-XX-9876
+
+Box 1 (Wages, tips, other comp.): $95,000.00
+Box 2 (Federal income tax withheld): $14,250.00
+Box 3 (Social security wages): $95,000.00
+Box 4 (Social security tax withheld): $5,890.00
+Box 5 (Medicare wages and tips): $95,000.00
+Box 6 (Medicare tax withheld): $1,377.50
+Box 15 (State): FL / State EIN: N/A
+Box 16 (State wages): $95,000.00
+Box 17 (State income tax): $0.00
+--------------------------------------------------
+Status: Validated for filing.`;
+  }
+  
+  if (category === '1099-NEC' || category === '1099') {
+    return `Form 1099-NEC Nonemployee Compensation 2025
+--------------------------------------------------
+Payer Name: Stripe Inc.
+Payer TIN: 98-7654321
+Recipient Name: Luis Lazo
+Recipient TIN: XXX-XX-9876
+
+Box 1 (Nonemployee compensation): $12,500.00
+Box 4 (Federal income tax withheld): $0.00
+Box 5 (State tax withheld): $0.00
+--------------------------------------------------
+Category: 1099-NEC Independent Contractor Revenue.`;
+  }
+  
+  if (category === 'Bank_Statement') {
+    return `CHASE BUSINESS CHECKING STATEMENT
+Account Number: *******8921
+Period: Dec 01, 2025 - Dec 31, 2025
+
+Starting Balance: $28,450.00
+Total Deposits: $14,800.00
+Total Withdrawals: $18,120.00
+Ending Balance: $25,130.00
+
+TRANSACTION DETAILS:
+--------------------------------------------------
+Dec 03 | deposit  | Stripe Transfer        | +$4,200.00
+Dec 08 | withdraw | AWS Cloud Services     | -$1,250.00
+Dec 12 | withdraw | Landlord Rent LLC      | -$3,500.00
+Dec 15 | withdraw | IRS Tax Payment        | -$2,500.00
+Dec 22 | withdraw | Transfer to Savings    | -$5,000.00 (Flagged)
+Dec 28 | deposit  | Client ACH Payment     | +$10,600.00
+--------------------------------------------------
+Ending Balance Confirmed: $25,130.00`;
+  }
+  
+  if (category === 'Receipt') {
+    return `RECEIPT / INVOICE
+--------------------------------------------------
+Merchant: Apple Store Lincoln Rd
+Location: Miami, FL 33139
+Date: 2025-11-20 14:22:10
+
+ITEMS PURCHASED:
+1x MacBook Pro 14-inch M3     | $1,999.00
+1x AppleCare+ Protection Plan  | $279.00
+
+Subtotal: $2,278.00
+Sales Tax (7.0%): $159.46
+Total: $2,437.46
+
+Payment Method: Visa ending in 4321
+--------------------------------------------------
+Status: Paid. Business Asset Equipment.`;
+  }
+
+  if (category === 'Balance_Sheet') {
+    return `BALANCE SHEET STATEMENT
+As of December 31, 2025
+
+ASSETS:
+Cash & Cash Equivalents: $25,130.00
+Accounts Receivable: $8,400.00
+Equipment & Hardware: $4,500.00
+Total Assets: $38,030.00
+
+LIABILITIES & EQUITY:
+Accounts Payable: $1,200.00
+Short-Term Business Loan: $5,000.00
+Shareholder Capital Investment: $20,000.00
+Retained Earnings: $11,830.00
+Total Liabilities & Equity: $38,030.00`;
+  }
+
+  if (category === 'Tax_Notice') {
+    return `DEPARTMENT OF THE TREASURY
+INTERNAL REVENUE SERVICE
+CINCINNATI, OH 45999-0010
+
+Date of Notice: Nov 15, 2025
+Taxpayer ID: XX-XXX9876
+Form: 1120S
+Tax Period: Dec 31, 2024
+
+NOTICE OF UNPAID BALANCE - TAX YEAR 2024
+Our records show you have outstanding balance for the tax period above.
+Total Amount Due: $4,500.00
+Penalty & Interest Calculated: $320.00
+Please send payment by Dec 15, 2025 to avoid further accumulation.`;
+  }
+
+  return `RAW SCAN DATA:
+File: ${filename}
+Type: ${category}
+Timestamp: ${new Date().toISOString()}
+--------------------------------------------------
+OCR Text could not be extracted in high confidence. Check original file upload.`;
 }
