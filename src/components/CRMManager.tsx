@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition } from 'react';
 import JSZip from 'jszip';
+import { PDFDocument } from 'pdf-lib';
 
 interface User {
   id: string;
@@ -32,6 +33,88 @@ interface Lead {
   notes?: string | null;
   aiDossier?: string | null;
   createdAt: string;
+}
+
+async function triggerMergeDocuments(docIds: string[], docNames: string[], outputName: string = 'merged.pdf') {
+  try {
+    const mergedPdf = await PDFDocument.create();
+
+    for (let i = 0; i < docIds.length; i++) {
+      const docId = docIds[i];
+      const docName = docNames[i] || 'document.pdf';
+      const extension = docName.split('.').pop()?.toLowerCase();
+
+      const url = `/accounting/api/crm/document/download?docId=${docId}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch document ${docId}`);
+      const arrayBuffer = await response.arrayBuffer();
+
+      if (extension === 'pdf') {
+        const srcPdf = await PDFDocument.load(arrayBuffer);
+        const copiedPages = await mergedPdf.copyPages(srcPdf, srcPdf.getPageIndices());
+        copiedPages.forEach((page) => mergedPdf.addPage(page));
+      } else if (extension === 'png' || extension === 'jpg' || extension === 'jpeg') {
+        const page = mergedPdf.addPage();
+        const { width, height } = page.getSize();
+        
+        let img;
+        if (extension === 'png') {
+          img = await mergedPdf.embedPng(arrayBuffer);
+        } else {
+          img = await mergedPdf.embedJpg(arrayBuffer);
+        }
+
+        const imgDims = img.scaleToFit(width - 40, height - 40);
+        page.drawImage(img, {
+          x: (width - imgDims.width) / 2,
+          y: (height - imgDims.height) / 2,
+          width: imgDims.width,
+          height: imgDims.height,
+        });
+      } else {
+        console.warn(`Unsupported file format for merging: ${extension}`);
+      }
+    }
+
+    const mergedPdfBytes = await mergedPdf.save();
+    const mergedBlob = new Blob([mergedPdfBytes as any], { type: 'application/pdf' });
+
+    if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: outputName,
+          types: [{
+            description: 'PDF Document',
+            accept: {
+              'application/pdf': ['.pdf']
+            }
+          }]
+        });
+
+        const writable = await handle.createWritable();
+        await writable.write(mergedBlob);
+        await writable.close();
+        return;
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          return;
+        }
+        console.warn("showSaveFilePicker failed or was aborted. Falling back to standard download.", err);
+      }
+    }
+
+    const url = URL.createObjectURL(mergedBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', outputName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Error merging files:", err);
+    alert("Error merging files. Make sure they are valid PDF or image files.");
+  }
 }
 
 async function triggerFolderDownloadAsZip(docIds: string[], docNames: string[], archiveName: string = 'documents.zip') {
@@ -190,6 +273,15 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     });
     const clientName = selectedConsoleClient ? `${selectedConsoleClient.user.name} Documents.zip` : 'documents.zip';
     await triggerFolderDownloadAsZip(selectedConsoleDocs, docNames, clientName);
+  };
+
+  const handleMergeSelected = async () => {
+    const docNames = selectedConsoleDocs.map(docId => {
+      const doc = consoleDocs.find(d => d.id === docId);
+      return doc ? doc.name : 'document.pdf';
+    });
+    const clientName = selectedConsoleClient ? `${selectedConsoleClient.user.name} Merged.pdf` : 'merged.pdf';
+    await triggerMergeDocuments(selectedConsoleDocs, docNames, clientName);
   };
 
   const handleUploadTaxReturn = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -782,12 +874,22 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                       {selectedConsoleDocs.length === consoleDocs.length ? 'Deselect All' : 'Select All'}
                     </button>
                     {selectedConsoleDocs.length > 0 && (
-                      <button
-                        onClick={handleDownloadSelected}
-                        className="px-2.5 py-1 bg-[#00f0ff] hover:bg-cyan-400 text-slate-900 text-[10px] font-extrabold uppercase rounded-lg shadow-[0_0_10px_rgba(0,240,255,0.2)] transition-all flex items-center gap-1"
-                      >
-                        📥 Download Selected ({selectedConsoleDocs.length})
-                      </button>
+                      <>
+                        <button
+                          onClick={handleDownloadSelected}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white text-[10px] font-extrabold uppercase rounded-lg border border-white/15 transition-all flex items-center gap-1"
+                          title="Download selected as ZIP archive"
+                        >
+                          📥 ZIP ({selectedConsoleDocs.length})
+                        </button>
+                        <button
+                          onClick={handleMergeSelected}
+                          className="px-2.5 py-1 bg-[#00f0ff] hover:bg-cyan-400 text-slate-900 text-[10px] font-extrabold uppercase rounded-lg shadow-[0_0_10px_rgba(0,240,255,0.2)] transition-all flex items-center gap-1"
+                          title="Merge selected files into a single PDF document"
+                        >
+                          🗂️ Merge ({selectedConsoleDocs.length})
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
