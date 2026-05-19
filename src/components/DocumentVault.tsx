@@ -33,7 +33,7 @@ interface DocumentVaultProps {
   clients: Client[];
 }
 
-const readFileAsBase64 = (file: File): Promise<string> => {
+const readFileAsBase64 = (file: File | Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -317,6 +317,35 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     setIsDragging(false);
   };
 
+  const convertImageToPdf = async (arrayBuffer: ArrayBuffer, fileName: string): Promise<{ pdfBytes: Uint8Array, pdfName: string }> => {
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage();
+    const { width, height } = page.getSize();
+
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    let img;
+    if (extension === 'png') {
+      img = await pdfDoc.embedPng(arrayBuffer);
+    } else {
+      img = await pdfDoc.embedJpg(arrayBuffer);
+    }
+
+    const imgDims = img.scaleToFit(width - 40, height - 40);
+    
+    page.drawImage(img, {
+      x: (width - imgDims.width) / 2,
+      y: (height - imgDims.height) / 2,
+      width: imgDims.width,
+      height: imgDims.height,
+    });
+
+    const pdfBytes = await pdfDoc.save();
+    const baseName = fileName.substring(0, fileName.lastIndexOf('.'));
+    const pdfName = `${baseName}.pdf`;
+
+    return { pdfBytes, pdfName };
+  };
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -330,20 +359,55 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       const size = file.size;
       const extension = name.split('.').pop()?.toUpperCase() || 'PDF';
 
+      const isImage = ['PNG', 'JPG', 'JPEG'].includes(extension);
+      const isPdf = extension === 'PDF';
+
+      if (!isPdf && !isImage) {
+        alert(`File "${name}" is not supported. Only PDF and image files (PNG, JPG, JPEG) are allowed in the vault. Image files will be automatically converted to PDF.`);
+        return;
+      }
+
+      let convertedName = name;
+      let convertedSize = size;
+      let convertedExtension = extension;
       let fileDataBase64: string | null = null;
-      try {
-        fileDataBase64 = await readFileAsBase64(file);
-      } catch (err) {
-        console.error("Error reading file binary:", err);
+
+      if (isImage) {
+        try {
+          const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = (err) => reject(err);
+            reader.readAsArrayBuffer(file);
+          });
+
+          const { pdfBytes, pdfName } = await convertImageToPdf(arrayBuffer, name);
+          const pdfBlob = new Blob([pdfBytes as any], { type: 'application/pdf' });
+          
+          convertedName = pdfName;
+          convertedSize = pdfBlob.size;
+          convertedExtension = 'PDF';
+          fileDataBase64 = await readFileAsBase64(pdfBlob);
+        } catch (err) {
+          console.error("Error converting image to PDF client-side:", err);
+          alert(`Error converting image "${name}" to PDF.`);
+          return;
+        }
+      } else {
+        try {
+          fileDataBase64 = await readFileAsBase64(file);
+        } catch (err) {
+          console.error("Error reading file binary:", err);
+        }
       }
 
       const tempDoc: Document = {
         id: newDocId,
         clientId: selectedClientId || null,
-        name,
+        name: convertedName,
         url: '#',
-        fileType: extension,
-        fileSize: size,
+        fileType: convertedExtension,
+        fileSize: convertedSize,
         taxYear: 2026,
         category: 'UNCLASSIFIED',
         status: 'OCR_PROCESSING',
@@ -409,9 +473,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              name,
-              fileSize: size,
-              fileType: extension,
+              name: convertedName,
+              fileSize: convertedSize,
+              fileType: convertedExtension,
               category,
               status: finalStatus,
               extractedText,
@@ -732,7 +796,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-sans font-bold select-none">
                     OCR TRANSCRIPT
                   </div>
-                  {activeDoc.extractedText || "No text could be extracted from this document."}
+                  {(!activeDoc.extractedText || activeDoc.extractedText.includes("RAW SCAN DATA:") || activeDoc.extractedText.includes("OCR Text could not be extracted")) 
+                    ? "No text could be extracted from this document." 
+                    : activeDoc.extractedText}
                 </div>
               </div>
 

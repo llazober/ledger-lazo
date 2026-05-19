@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
 import { auditClientDocuments } from '@/lib/taxRules';
+import { PDFDocument } from 'pdf-lib';
 
 // Dynamic document classifier using OpenAI GPT-4o-mini (falls back to regex rules)
 async function classifyDocumentWithAI(
@@ -239,21 +240,42 @@ export async function POST(req: Request) {
         }
       }
 
+      let convertedName = name;
+      let convertedSize = parsedSize;
+      let convertedFileType = fileType || 'PDF';
+      let finalBase64 = fileDataBase64;
+
+      const attachmentExtension = name.split('.').pop()?.toLowerCase() || '';
+      const isImage = ['png', 'jpg', 'jpeg'].includes(attachmentExtension);
+
+      if (isImage && finalBase64) {
+        try {
+          const imgBuffer = Buffer.from(finalBase64, 'base64');
+          const { pdfBuffer, pdfName } = await convertImageToPdfServer(imgBuffer, name);
+          convertedName = pdfName;
+          convertedSize = pdfBuffer.length;
+          convertedFileType = 'PDF';
+          finalBase64 = pdfBuffer.toString('base64');
+        } catch (err) {
+          console.error("Error converting image attachment to PDF on server:", err);
+        }
+      }
+
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,
-          name,
+          name: convertedName,
           url: url || '#',
-          fileSize: parsedSize,
-          fileType: fileType || 'PDF',
+          fileSize: convertedSize,
+          fileType: convertedFileType,
           taxYear: 2026,
           category: aiResult.category,
           status: aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED',
-          extractedText: generateRealisticMockOCRText(name, aiResult.category),
+          extractedText: generateRealisticMockOCRText(convertedName, aiResult.category),
           aiSummary: aiResult.aiSummary,
           confidenceScore: aiResult.confidenceScore,
           validationErrors: aiResult.validationErrors,
-          fileData: fileDataBase64
+          fileData: finalBase64
         }
       });
 
@@ -506,4 +528,37 @@ Please send payment by Dec 15, 2025 to avoid further accumulation.`;
   }
 
   return "No text could be extracted from this document.";
+}
+
+async function convertImageToPdfServer(buffer: Buffer, filename: string): Promise<{ pdfBuffer: Buffer, pdfName: string }> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage();
+  const { width, height } = page.getSize();
+
+  const extension = filename.split('.').pop()?.toLowerCase();
+  let img;
+  if (extension === 'png') {
+    img = await pdfDoc.embedPng(buffer);
+  } else {
+    img = await pdfDoc.embedJpg(buffer);
+  }
+
+  // Scale the image to fit the page margin (20px padding)
+  const imgDims = img.scaleToFit(width - 40, height - 40);
+  
+  // Center
+  page.drawImage(img, {
+    x: (width - imgDims.width) / 2,
+    y: (height - imgDims.height) / 2,
+    width: imgDims.width,
+    height: imgDims.height,
+  });
+
+  const pdfBytes = await pdfDoc.save();
+  const pdfBuffer = Buffer.from(pdfBytes);
+  
+  const baseName = filename.substring(0, filename.lastIndexOf('.'));
+  const pdfName = `${baseName}.pdf`;
+
+  return { pdfBuffer, pdfName };
 }
