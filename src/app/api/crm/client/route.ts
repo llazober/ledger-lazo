@@ -8,8 +8,26 @@ export async function PATCH(req: Request) {
 
     const client = await prisma.client.update({
       where: { id: clientId },
-      data: { status }
+      data: { status },
+      include: { user: true }
     });
+
+    // Notify n8n of the status change if configured
+    if (process.env.N8N_WEBHOOK_URL) {
+      fetch(process.env.N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          event: 'CLIENT_STATUS_CHANGED', 
+          status, 
+          clientId, 
+          clientName: client.user.name,
+          clientEmail: client.user.email,
+          taxType: client.taxType,
+          taxYear: client.taxYear
+        }),
+      }).catch(err => console.error("N8n status webhook notification failed:", err));
+    }
 
     return NextResponse.json({ success: true, client });
   } catch (error: any) {

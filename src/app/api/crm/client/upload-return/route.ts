@@ -42,10 +42,31 @@ export async function POST(req: Request) {
     });
 
     // Automatically transition Client status to REVIEW (In Review)
-    await prisma.client.update({
+    const client = await prisma.client.update({
       where: { id: clientId },
-      data: { status: 'REVIEW' }
+      data: { status: 'REVIEW' },
+      include: { user: true }
     });
+
+    // Notify n8n of the status change and include document links
+    if (process.env.N8N_WEBHOOK_URL) {
+      fetch(process.env.N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          event: 'CLIENT_STATUS_CHANGED', 
+          status: 'REVIEW', 
+          clientId, 
+          clientName: client.user.name,
+          clientEmail: client.user.email,
+          taxType: client.taxType,
+          taxYear: client.taxYear,
+          documentId: updatedDoc.id,
+          documentName: updatedDoc.name,
+          downloadUrl: `https://portal.datalazo.net/accounting/api/crm/document/download?docId=${updatedDoc.id}`
+        }),
+      }).catch(err => console.error("N8n status webhook notification failed:", err));
+    }
 
     return NextResponse.json({ 
       success: true, 

@@ -1,0 +1,142 @@
+{
+  "name": "Workflow 2: CPA Ledger - Client Sign-Off & Reply Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "postTriggerAction": "read",
+        "format": "resolved",
+        "onEmailReceived": "nothing",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "IMAP Email Trigger",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 1,
+      "position": [
+        250,
+        360
+      ],
+      "credentials": {
+        "imap": {
+          "id": "imap-credential-id",
+          "name": "Firm Support Inbox"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.text.toUpperCase() }}",
+              "operation": "contains",
+              "value2": "APPROVED"
+            }
+          ]
+        }
+      },
+      "id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Is Reply APPROVED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        480,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://portal.datalazo.net/accounting/api/crm/client/sign-off",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"email\":\"{{ $node[\"IMAP Email Trigger\"].json.from.value[0].address }}\"}",
+        "options": {}
+      },
+      "id": "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
+      "name": "Post to Ledger App Sign-Off API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        720,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headersUi": {
+          "parameter": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"from\":\"Office <office@datalazo.net>\",\"to\":\"{{ $node[\"IMAP Email Trigger\"].json.from.value[0].address }}\",\"subject\":\"Thank You: Tax Return Approved\",\"html\":\"<h3>Authorization Received</h3><p>We have successfully registered your authorization for the 2026 tax filing.</p><p>No further actions are required from your end. We will notify you once the filing process is finalized.</p><br/><p>Best regards,<br/><strong>Datalazo Ledger Services</strong></p>\"}",
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        960,
+        340
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "resend-api-key",
+          "name": "Resend API Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "IMAP Email Trigger": {
+      "main": [
+        [
+          {
+            "node": "Is Reply APPROVED?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Reply APPROVED?": {
+      "main": [
+        [
+          {
+            "node": "Post to Ledger App Sign-Off API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Ledger App Sign-Off API": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "c56b78ef-342d-96e0-e17f-539e0839a123",
+  "id": "workflow-signoff-trigger"
+}

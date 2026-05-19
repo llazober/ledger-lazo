@@ -1,0 +1,107 @@
+{
+  "name": "Workflow 1: CPA Ledger - Client Review Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ledger",
+        "options": {}
+      },
+      "id": "e0d3cb35-b2fb-4e2e-8367-a2f0a82b4dc2",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.event }}",
+              "value2": "CLIENT_STATUS_CHANGED"
+            },
+            {
+              "value1": "={{ $json.body.status }}",
+              "value2": "REVIEW"
+            }
+          ]
+        }
+      },
+      "id": "67040fd1-512c-469b-980b-93df94e2cc76",
+      "name": "If Status is REVIEW",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        470,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headersUi": {
+          "parameter": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"from\":\"Office <office@datalazo.net>\",\"to\":\"{{ $node[\"Webhook Trigger\"].json.body.clientEmail }}\",\"subject\":\"Action Required: Tax Return Ready for Review ({{ $node[\"Webhook Trigger\"].json.body.taxYear }})\",\"html\":\"<h3>Dear {{ $node[\"Webhook Trigger\"].json.body.clientName }},</h3><p>Your prepared tax return is ready for your review and sign-off.</p><p>Please download and inspect the document using the secure link below:</p><p><a href=\\\"{{ $node[\"Webhook Trigger\"].json.body.downloadUrl || 'https://portal.datalazo.net/accounting/dashboard/documents' }}\\\" style=\\\"display:inline-block;background:#00f0ff;color:#000000;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:bold;font-family:sans-serif;\\\">📥 Download & Review Return</a></p><p>To authorize filing of this tax return, please reply directly to this email with the word <strong>APPROVED</strong> or let your accountant know.</p><br/><p>Best regards,<br/><strong>Datalazo Ledger Services</strong></p>\"}",
+        "options": {}
+      },
+      "id": "e2f18ef0-9bb4-4cfd-b2a6-c955743b171c",
+      "name": "Send Email via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        710,
+        340
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "resend-api-key",
+          "name": "Resend API Token"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "If Status is REVIEW",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Status is REVIEW": {
+      "main": [
+        [
+          {
+            "node": "Send Email via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "versionId": "b18b456e-82a1-432d-96e0-e17f539e0839",
+  "id": "workflow-review-trigger"
+}
