@@ -2,11 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   basePath: '/accounting',
-  async rewrites() {
+  async redirects() {
     return [
       {
         source: '/',
         destination: '/accounting',
+        permanent: true,
         basePath: false,
       },
     ];
