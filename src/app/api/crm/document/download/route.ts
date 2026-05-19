@@ -20,6 +20,8 @@ export async function GET(req: Request) {
       return new Response("Document not found", { status: 404 });
     }
 
+    const preview = searchParams.get('preview') === 'true';
+
     // 1. If we have database base64 encoded file data
     if (document.fileData) {
       const fileBuffer = Buffer.from(document.fileData, 'base64');
@@ -29,10 +31,12 @@ export async function GET(req: Request) {
       else if (document.fileType === 'JPG' || document.fileType === 'JPEG') contentType = 'image/jpeg';
       else if (document.fileType === 'PNG') contentType = 'image/png';
 
+      const disposition = preview ? 'inline' : `attachment; filename="${document.name}"`;
+
       return new Response(fileBuffer, {
         headers: {
           'Content-Type': contentType,
-          'Content-Disposition': `attachment; filename="${document.name}"`,
+          'Content-Disposition': disposition,
         }
       });
     }
@@ -58,11 +62,12 @@ CPA SYSTEM AUTOMATED TRANSCRIPT GENERATOR
 
     const textBuffer = Buffer.from(fileContent, 'utf-8');
     const safeName = document.name.endsWith('.txt') ? document.name : `${document.name.replace(/\.[^/.]+$/, "")}.txt`;
+    const disposition = preview ? 'inline' : `attachment; filename="${safeName}"`;
 
     return new Response(textBuffer, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${safeName}"`,
+        'Content-Disposition': disposition,
       }
     });
 

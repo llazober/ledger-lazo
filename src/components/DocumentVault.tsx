@@ -354,6 +354,25 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">VALIDATED</span>
                     )}
                     
+                    <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <a 
+                        href={`/accounting/api/crm/document/download?docId=${doc.id}&preview=true`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all font-semibold"
+                        title="Preview inline"
+                      >
+                        👁️
+                      </a>
+                      <a 
+                        href={`/accounting/api/crm/document/download?docId=${doc.id}`}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-[#00f0ff]/5 hover:bg-[#00f0ff]/15 px-2 py-1 rounded transition-all font-semibold"
+                        title="Download file"
+                      >
+                        📥
+                      </a>
+                    </div>
+                    
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -222,6 +222,23 @@ export async function POST(req: Request) {
       // Classify the document category using OpenAI
       const aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
 
+      // Download attachment binary to save in the database as base64 (Option 1)
+      let fileDataBase64: string | null = null;
+      if (url && url.startsWith('http')) {
+        try {
+          console.log(`Downloading attachment binary from: ${url}`);
+          const fileRes = await fetch(url);
+          if (fileRes.ok) {
+            const arrayBuffer = await fileRes.arrayBuffer();
+            fileDataBase64 = Buffer.from(arrayBuffer).toString('base64');
+          } else {
+            console.warn(`Failed to fetch attachment binary. Status: ${fileRes.status}`);
+          }
+        } catch (fetchErr) {
+          console.error("Error downloading attachment binary:", fetchErr);
+        }
+      }
+
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,
@@ -235,7 +252,8 @@ export async function POST(req: Request) {
           extractedText: generateRealisticMockOCRText(name, aiResult.category),
           aiSummary: aiResult.aiSummary,
           confidenceScore: aiResult.confidenceScore,
-          validationErrors: aiResult.validationErrors
+          validationErrors: aiResult.validationErrors,
+          fileData: fileDataBase64
         }
       });
 

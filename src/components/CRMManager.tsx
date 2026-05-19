@@ -667,13 +667,24 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                         </div>
                       </div>
                       
-                      <a 
-                        href={`/accounting/api/crm/document/download?docId=${doc.id}`}
-                        className="px-3 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/20 text-[11px] font-bold rounded-lg transition-all"
-                        title="Download file"
-                      >
-                        📥 Download
-                      </a>
+                      <div className="flex gap-2 shrink-0">
+                        <a 
+                          href={`/accounting/api/crm/document/download?docId=${doc.id}&preview=true`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 text-[11px] font-bold rounded-lg transition-all"
+                          title="Preview file inline"
+                        >
+                          👁️ Preview
+                        </a>
+                        <a 
+                          href={`/accounting/api/crm/document/download?docId=${doc.id}`}
+                          className="px-2.5 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/20 text-[11px] font-bold rounded-lg transition-all"
+                          title="Download file"
+                        >
+                          📥 Download
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>
