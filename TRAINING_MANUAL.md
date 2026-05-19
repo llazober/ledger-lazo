@@ -96,4 +96,19 @@ When tax returns are completed by the accountant, they are moved to `REVIEW` and
 *   **Action**: Automatically transitions the client's status to `COMPLETED` in the database.
 
 ---
+
+## 5. 🔌 How to Import Workflows into n8n
+
+Follow these steps to import the configured workflow files into your n8n workspace:
+
+1. **Copy JSON**: Open either [n8n_workflow_1_review.json](file:///c:/Users/luisl/Accounting%20App/n8n_workflow_1_review.json) or [n8n_workflow_2_signoff.json](file:///c:/Users/luisl/Accounting%20App/n8n_workflow_2_signoff.json) in your editor, select all text (`Ctrl + A` / `Cmd + A`), and copy it (`Ctrl + C` / `Cmd + C`).
+2. **Open n8n**: Open your n8n editor cockpit in your browser.
+3. **Create Workflow**: Click **"+ Add workflow"** in the top-right corner to open a blank canvas.
+4. **Paste Nodes**: Click on the empty grid canvas and paste (`Ctrl + V` / `Cmd + V`). The nodes and connection pathways will appear instantly.
+5. **Set Credentials**:
+   * Double-click the **Resend** / HTTP Request nodes and select or create your Resend API header credentials.
+   * Double-click the **IMAP Email Trigger** and configure your firm's email credentials.
+6. **Activate**: Click the **"Active"** toggle in the top-right corner to go live.
+
+---
 *Generated for CPA Ledger App | v3.6 — Fulfillment Automation*
