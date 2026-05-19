@@ -30,9 +30,14 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.text.toUpperCase() }}",
+              "value1": "={{ $json.text.slice(0, 150).toUpperCase() }}",
               "operation": "contains",
               "value2": "APPROVED"
+            },
+            {
+              "value1": "={{ $json.from.value[0].address.toLowerCase() }}",
+              "operation": "notEqual",
+              "value2": "office@datalazo.net"
             }
           ]
         }
