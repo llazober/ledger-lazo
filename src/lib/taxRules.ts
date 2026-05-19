@@ -12,6 +12,10 @@ export interface TaxRule {
  * Configure required documents per tax type here.
  * Easy to add, edit, or customize.
  */
+export const INCOME_DOC_CATEGORIES = [
+  "W2", "1099-NEC", "1099", "1099-INT", "1099-DIV", "1099-R", "1099-MISC", "1099-B", "SSA-1099"
+];
+
 export const TAX_RULES: Record<string, TaxRule> = {
   // 1040: Individual Tax Return
   "1040": {
@@ -19,7 +23,7 @@ export const TAX_RULES: Record<string, TaxRule> = {
     requirements: [
       { 
         name: "Tax Income Form", 
-        categories: ["W2", "1099-NEC", "1099"] 
+        categories: INCOME_DOC_CATEGORIES
       }
     ]
   },
@@ -34,7 +38,7 @@ export const TAX_RULES: Record<string, TaxRule> = {
       },
       { 
         name: "W-2 / 1099 Information", 
-        categories: ["W2", "1099-NEC", "1099"] 
+        categories: INCOME_DOC_CATEGORIES
       }
     ]
   },
@@ -49,7 +53,7 @@ export const TAX_RULES: Record<string, TaxRule> = {
       },
       { 
         name: "Partner Information Forms", 
-        categories: ["W2", "1099-NEC", "1099"] 
+        categories: INCOME_DOC_CATEGORIES
       }
     ]
   },
@@ -64,7 +68,7 @@ export const TAX_RULES: Record<string, TaxRule> = {
       },
       { 
         name: "W-2 / 1099 Information", 
-        categories: ["W2", "1099-NEC", "1099"] 
+        categories: INCOME_DOC_CATEGORIES
       }
     ]
   }
@@ -78,7 +82,7 @@ export const DEFAULT_TAX_RULE: TaxRule = {
   requirements: [
     { 
       name: "Tax Income Form", 
-      categories: ["W2", "1099-NEC", "1099"] 
+      categories: INCOME_DOC_CATEGORIES
     },
     { 
       name: "Bank Statement", 

@@ -29,7 +29,7 @@ Filename: "${filename}"
 Email Subject: "${subject}"
 Email Body: "${bodyText}"
 
-Classify it into one of these exact categories: "W2", "1099-NEC", "1099", "Bank_Statement", "Receipt", "Tax_Notice", "Ledger", "Balance_Sheet", "UNCLASSIFIED".
+Classify it into one of these exact categories: "W2", "1099-NEC", "1099", "1099-INT", "1099-DIV", "1099-R", "1099-MISC", "1099-B", "SSA-1099", "Bank_Statement", "Receipt", "Tax_Notice", "Ledger", "Balance_Sheet", "UNCLASSIFIED".
 
 Also, generate a 1-sentence summary of the document based on its name/context.
 Provide a confidence score between 0.0 and 1.0.
@@ -68,9 +68,37 @@ function fallbackClassifier(filename: string) {
     category = 'W2';
     aiSummary = 'W-2 Wage and Tax Statement.';
     confidenceScore = 0.9;
-  } else if (nameLower.includes('1099')) {
+  } else if (nameLower.includes('1099-int') || nameLower.includes('1099int')) {
+    category = '1099-INT';
+    aiSummary = '1099-INT Interest Income Statement.';
+    confidenceScore = 0.9;
+  } else if (nameLower.includes('1099-div') || nameLower.includes('1099div')) {
+    category = '1099-DIV';
+    aiSummary = '1099-DIV Dividends and Distributions Statement.';
+    confidenceScore = 0.9;
+  } else if (nameLower.includes('1099-r') || nameLower.includes('1099r')) {
+    category = '1099-R';
+    aiSummary = '1099-R Retirement Distributions Statement.';
+    confidenceScore = 0.9;
+  } else if (nameLower.includes('1099-misc') || nameLower.includes('1099misc')) {
+    category = '1099-MISC';
+    aiSummary = '1099-MISC Miscellaneous Income Statement.';
+    confidenceScore = 0.9;
+  } else if (nameLower.includes('1099-b') || nameLower.includes('1099b')) {
+    category = '1099-B';
+    aiSummary = '1099-B Brokerage Barter Transactions Statement.';
+    confidenceScore = 0.9;
+  } else if (nameLower.includes('1099-nec') || nameLower.includes('1099nec')) {
     category = '1099-NEC';
-    aiSummary = '1099 Nonemployee Compensation statement.';
+    aiSummary = '1099-NEC Nonemployee Compensation Statement.';
+    confidenceScore = 0.9;
+  } else if (nameLower.includes('1099')) {
+    category = '1099';
+    aiSummary = '1099 Information Return.';
+    confidenceScore = 0.85;
+  } else if (nameLower.includes('ssa-1099') || nameLower.includes('ssa1099') || nameLower.includes('social security')) {
+    category = 'SSA-1099';
+    aiSummary = 'SSA-1099 Social Security Benefit Statement.';
     confidenceScore = 0.9;
   } else if (
     nameLower.includes('bank') || 
@@ -285,6 +313,88 @@ Box 17 (State income tax): $0.00
 Status: Validated for filing.`;
   }
   
+  if (category === '1099-INT') {
+    return `Form 1099-INT Interest Income 2025
+--------------------------------------------------
+Payer Name: Chase Bank N.A.
+Recipient Name: Luis Lazo
+
+Box 1 (Interest income): $1,450.00
+Box 3 (Interest on U.S. Savings Bonds): $0.00
+Box 4 (Federal income tax withheld): $0.00
+--------------------------------------------------
+Status: Validated. Categorized as taxable interest income.`;
+  }
+
+  if (category === '1099-DIV') {
+    return `Form 1099-DIV Dividends and Distributions 2025
+--------------------------------------------------
+Payer Name: Vanguard Group Inc.
+Recipient Name: Luis Lazo
+
+Box 1a (Total ordinary dividends): $2,800.00
+Box 1b (Qualified dividends): $2,100.00
+Box 2a (Total capital gain distr.): $450.00
+Box 4 (Federal income tax withheld): $0.00
+--------------------------------------------------
+Status: Validated. Dividends mapped to Schedule B.`;
+  }
+
+  if (category === '1099-R') {
+    return `Form 1099-R Distributions From Pensions, Annuities, etc. 2025
+--------------------------------------------------
+Payer Name: Fidelity Investments
+Recipient Name: Luis Lazo
+
+Box 1 (Gross distribution): $15,000.00
+Box 2a (Taxable amount): $15,000.00
+Box 4 (Federal income tax withheld): $1,500.00
+Box 7 (Distribution code): 7 (Normal distribution)
+--------------------------------------------------
+Status: Validated. IRA/401k distribution registered.`;
+  }
+
+  if (category === '1099-MISC') {
+    return `Form 1099-MISC Miscellaneous Information 2025
+--------------------------------------------------
+Payer Name: Real Estate Mgmt LLC
+Recipient Name: Luis Lazo
+
+Box 1 (Rents): $18,000.00
+Box 3 (Other income): $0.00
+Box 4 (Federal income tax withheld): $0.00
+--------------------------------------------------
+Status: Validated. Rental income mapped to Schedule E.`;
+  }
+
+  if (category === '1099-B') {
+    return `Form 1099-B Proceeds From Brokerage Transactions 2025
+--------------------------------------------------
+Payer Name: Charles Schwab & Co.
+Recipient Name: Luis Lazo
+
+Box 1d (Proceeds from transactions): $45,800.00
+Box 1e (Cost or other basis): $38,200.00
+Box 1g (Wash sale loss disallowed): $0.00
+Net Realized Gain/Loss: +$7,600.00 (Short-term)
+--------------------------------------------------
+Status: Validated. Mapped to Schedule D (Capital Gains).`;
+  }
+
+  if (category === 'SSA-1099') {
+    return `Form SSA-1099 - SOCIAL SECURITY BENEFIT STATEMENT 2025
+--------------------------------------------------
+Payer: Social Security Administration
+Recipient Name: Luis Lazo
+Social Security Number: XXX-XX-9876
+
+Box 3 (Benefits paid in 2025): $24,600.00
+Box 4 (Federal income tax withheld): $0.00
+Net Benefits Paid: $24,600.00
+--------------------------------------------------
+Status: Validated. Social Security Income processed.`;
+  }
+
   if (category === '1099-NEC' || category === '1099') {
     return `Form 1099-NEC Nonemployee Compensation 2025
 --------------------------------------------------
