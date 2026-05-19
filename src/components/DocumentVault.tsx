@@ -382,6 +382,29 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
                 </div>
               )}
 
+              {/* Document Text / Preview Viewer */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">File Content Preview</span>
+                  {activeDoc.url && activeDoc.url !== '#' && (
+                    <a
+                      href={activeDoc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9px] text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center gap-1 bg-cyan-900/20 px-2 py-0.5 rounded border border-cyan-500/20 transition-all hover:scale-105"
+                    >
+                      👁️ Open Original Document
+                    </a>
+                  )}
+                </div>
+                <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 min-h-[140px] max-h-[200px] overflow-y-auto text-slate-800 font-mono text-[10px] leading-relaxed whitespace-pre-wrap shadow-inner relative select-text">
+                  <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-sans font-bold select-none">
+                    OCR TRANSCRIPT
+                  </div>
+                  {activeDoc.extractedText || "No text could be extracted from this document."}
+                </div>
+              </div>
+
               {activeDoc.aiSummary && (
                 <div className="space-y-1.5 pt-1">
                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">AI Executive Brief</span>
