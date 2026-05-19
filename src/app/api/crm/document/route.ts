@@ -13,7 +13,9 @@ export async function POST(req: Request) {
       extractedText, 
       aiSummary, 
       confidenceScore, 
-      validationErrors 
+      validationErrors,
+      fileData,
+      clientId
     } = body;
 
     const document = await prisma.document.create({
@@ -28,7 +30,9 @@ export async function POST(req: Request) {
         extractedText: extractedText || null,
         aiSummary: aiSummary || null,
         confidenceScore: confidenceScore || 0.0,
-        validationErrors: validationErrors || null
+        validationErrors: validationErrors || null,
+        fileData: fileData || null,
+        clientId: clientId || null
       }
     });
 

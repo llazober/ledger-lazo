@@ -31,6 +31,18 @@ interface DocumentVaultProps {
   clients: Client[];
 }
 
+const readFileAsBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 export default function DocumentVault({ initialDocs, clients }: DocumentVaultProps) {
   const [docs, setDocs] = useState<Document[]>(initialDocs);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -93,15 +105,22 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
     
-    // Simulate File Upload & Mock OCR Processing
-    files.forEach(file => {
+    files.forEach(async (file) => {
       const newDocId = 'doc_' + Math.random().toString(36).substr(2, 9);
       const name = file.name;
       const size = file.size;
       const extension = name.split('.').pop()?.toUpperCase() || 'PDF';
 
+      let fileDataBase64: string | null = null;
+      try {
+        fileDataBase64 = await readFileAsBase64(file);
+      } catch (err) {
+        console.error("Error reading file binary:", err);
+      }
+
       const tempDoc: Document = {
         id: newDocId,
+        clientId: selectedClientId || null,
         name,
         url: '#',
         fileType: extension,
@@ -179,7 +198,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
               extractedText,
               aiSummary,
               confidenceScore,
-              validationErrors
+              validationErrors,
+              fileData: fileDataBase64,
+              clientId: selectedClientId || null
             })
           });
         } catch (err) {
