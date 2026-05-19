@@ -8,6 +8,23 @@ export const revalidate = 0;
 export default async function DocumentsPage() {
   try {
     let docs = await prisma.document.findMany({
+      select: {
+        id: true,
+        clientId: true,
+        name: true,
+        url: true,
+        fileType: true,
+        fileSize: true,
+        taxYear: true,
+        category: true,
+        status: true,
+        extractedText: true,
+        aiSummary: true,
+        confidenceScore: true,
+        validationErrors: true,
+        createdAt: true,
+        updatedAt: true
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -67,6 +84,23 @@ export default async function DocumentsPage() {
       }
 
       docs = await prisma.document.findMany({
+        select: {
+          id: true,
+          clientId: true,
+          name: true,
+          url: true,
+          fileType: true,
+          fileSize: true,
+          taxYear: true,
+          category: true,
+          status: true,
+          extractedText: true,
+          aiSummary: true,
+          confidenceScore: true,
+          validationErrors: true,
+          createdAt: true,
+          updatedAt: true
+        },
         orderBy: { createdAt: 'desc' }
       });
     }
