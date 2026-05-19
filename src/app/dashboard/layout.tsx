@@ -92,8 +92,8 @@ export default function DashboardLayout({
           </div>
           <button 
             onClick={async () => {
-              await fetch('/api/auth/logout', { method: 'POST' });
-              window.location.href = '/login';
+              await fetch('/accounting/api/auth/logout', { method: 'POST' });
+              window.location.href = '/accounting/login';
             }}
             className="w-full px-4 py-2.5 bg-red-500/5 text-red-400 text-[10px] font-bold tracking-wider uppercase rounded-xl hover:bg-red-500/10 transition-all text-center border border-red-500/15"
           >

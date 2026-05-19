@@ -84,7 +84,7 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     
     startTransition(async () => {
       try {
-        const response = await fetch('/api/crm/lead', {
+        const response = await fetch('/accounting/api/crm/lead', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ leadId, status: newStatus }),
@@ -109,7 +109,7 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     
     startTransition(async () => {
       try {
-        await fetch('/api/crm/client', {
+        await fetch('/accounting/api/crm/client', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clientId, status: newStatus }),
@@ -128,7 +128,7 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     
     startTransition(async () => {
       try {
-        await fetch('/api/crm/lead/notes', {
+        await fetch('/accounting/api/crm/lead/notes', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ leadId: selectedLead.id, notes: noteText }),
@@ -145,7 +145,7 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
 
     startTransition(async () => {
       try {
-        const response = await fetch('/api/crm/lead', {
+        const response = await fetch('/accounting/api/crm/lead', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newLeadForm),

@@ -132,7 +132,7 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
 
         // Optional server push
         try {
-          await fetch('/api/crm/document', {
+          await fetch('/accounting/api/crm/document', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
