@@ -48,6 +48,28 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [activeDoc, setActiveDoc] = useState<Document | null>(initialDocs[0] || null);
+  const [selectedVaultDocs, setSelectedVaultDocs] = useState<string[]>([]);
+
+  const handleToggleVaultDocSelection = (docId: string) => {
+    setSelectedVaultDocs(prev => 
+      prev.includes(docId) 
+        ? prev.filter(id => id !== docId) 
+        : [...prev, docId]
+    );
+  };
+
+  const handleDownloadSelectedVault = () => {
+    selectedVaultDocs.forEach((docId, index) => {
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = `/accounting/api/crm/document/download?docId=${docId}`;
+        link.setAttribute('download', '');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 400);
+    });
+  };
   
   // RAG Chat States
   const [chatInput, setChatInput] = useState('');
@@ -321,7 +343,33 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
           {/* Document list table */}
           <div className="glass overflow-hidden flex-1 flex flex-col">
             <div className="p-4 border-b border-white/5 bg-white/[0.01] flex justify-between items-center flex-wrap gap-3">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-300">File Directory</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-slate-300">File Directory</h3>
+                {filteredDocs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (selectedVaultDocs.length === filteredDocs.length) {
+                          setSelectedVaultDocs([]);
+                        } else {
+                          setSelectedVaultDocs(filteredDocs.map(d => d.id));
+                        }
+                      }}
+                      className="px-2 py-0.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[9px] font-bold uppercase rounded transition-all"
+                    >
+                      {selectedVaultDocs.length === filteredDocs.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    {selectedVaultDocs.length > 0 && (
+                      <button
+                        onClick={handleDownloadSelectedVault}
+                        className="px-2.5 py-0.5 bg-[#00f0ff] hover:bg-cyan-400 text-slate-900 text-[10px] font-extrabold uppercase rounded-lg shadow-[0_0_10px_rgba(0,240,255,0.2)] transition-all flex items-center gap-1"
+                      >
+                        📥 Download ({selectedVaultDocs.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* Client Filter Dropdown */}
               <div className="flex items-center gap-2">
@@ -351,7 +399,16 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   }`}
                 >
                   <div className="flex items-center gap-3 overflow-hidden pr-2 text-left">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] ${
+                    <input 
+                      type="checkbox"
+                      checked={selectedVaultDocs.includes(doc.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleToggleVaultDocSelection(doc.id);
+                      }}
+                      className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
+                    />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
                       doc.fileType === 'PDF' ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'
                     }`}>
                       {doc.fileType}

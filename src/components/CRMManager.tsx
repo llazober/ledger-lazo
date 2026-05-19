@@ -52,6 +52,7 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
   // Client Tax Console Modal States
   const [selectedConsoleClient, setSelectedConsoleClient] = useState<Client | null>(null);
   const [consoleDocs, setConsoleDocs] = useState<any[]>([]);
+  const [selectedConsoleDocs, setSelectedConsoleDocs] = useState<string[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -59,6 +60,7 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     setSelectedConsoleClient(client);
     setIsLoadingDocs(true);
     setConsoleDocs([]);
+    setSelectedConsoleDocs([]);
     try {
       const res = await fetch(`/accounting/api/crm/client/documents?clientId=${client.id}`);
       const data = await res.json();
@@ -70,6 +72,27 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     } finally {
       setIsLoadingDocs(false);
     }
+  };
+
+  const handleToggleDocSelection = (docId: string) => {
+    setSelectedConsoleDocs(prev => 
+      prev.includes(docId) 
+        ? prev.filter(id => id !== docId) 
+        : [...prev, docId]
+    );
+  };
+
+  const handleDownloadSelected = () => {
+    selectedConsoleDocs.forEach((docId, index) => {
+      setTimeout(() => {
+        const link = document.createElement('a');
+        link.href = `/accounting/api/crm/document/download?docId=${docId}`;
+        link.setAttribute('download', '');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 400);
+    });
   };
 
   const handleUploadTaxReturn = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -642,9 +665,36 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
 
             {/* Document List */}
             <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Uploaded Client Documents
-              </h4>
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Uploaded Client Documents
+                </h4>
+                
+                {consoleDocs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (selectedConsoleDocs.length === consoleDocs.length) {
+                          setSelectedConsoleDocs([]);
+                        } else {
+                          setSelectedConsoleDocs(consoleDocs.map(d => d.id));
+                        }
+                      }}
+                      className="px-2 py-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[9px] font-bold uppercase rounded transition-all"
+                    >
+                      {selectedConsoleDocs.length === consoleDocs.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    {selectedConsoleDocs.length > 0 && (
+                      <button
+                        onClick={handleDownloadSelected}
+                        className="px-2.5 py-1 bg-[#00f0ff] hover:bg-cyan-400 text-slate-900 text-[10px] font-extrabold uppercase rounded-lg shadow-[0_0_10px_rgba(0,240,255,0.2)] transition-all flex items-center gap-1"
+                      >
+                        📥 Download Selected ({selectedConsoleDocs.length})
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {isLoadingDocs ? (
                 <div className="p-4 text-center text-slate-500 text-xs animate-pulse">
@@ -657,13 +707,21 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
               ) : (
                 <div className="divide-y divide-white/5 max-h-[180px] overflow-y-auto pr-1 border border-white/5 rounded-xl bg-[#0a0a0c]/40">
                   {consoleDocs.map(doc => (
-                    <div key={doc.id} className="p-3 flex justify-between items-center text-xs">
-                      <div>
-                        <span className="font-semibold text-white block truncate max-w-[280px]">{doc.name}</span>
-                        <div className="flex gap-2 items-center text-[10px] text-slate-500 mt-0.5">
-                          <span className="bg-white/5 px-1.5 py-0.5 rounded font-black text-slate-400 uppercase text-[9px]">{doc.category}</span>
-                          <span>•</span>
-                          <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                    <div key={doc.id} className="p-3 flex justify-between items-center text-xs hover:bg-white/[0.01]">
+                      <div className="flex items-center gap-2.5 overflow-hidden pr-2">
+                        <input 
+                          type="checkbox"
+                          checked={selectedConsoleDocs.includes(doc.id)}
+                          onChange={() => handleToggleDocSelection(doc.id)}
+                          className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
+                        />
+                        <div className="overflow-hidden text-left">
+                          <span className="font-semibold text-white block truncate max-w-[220px]">{doc.name}</span>
+                          <div className="flex gap-2 items-center text-[10px] text-slate-500 mt-0.5">
+                            <span className="bg-white/5 px-1.5 py-0.5 rounded font-black text-slate-400 uppercase text-[9px]">{doc.category}</span>
+                            <span>•</span>
+                            <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                          </div>
                         </div>
                       </div>
                       
