@@ -16,12 +16,8 @@ export async function POST(req: Request) {
 
     const safeHistory = Array.isArray(history) ? history : [];
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { 
-          role: "system", 
-          content: `You are Lazo, the premium AI Concierge for Datalazo Ledger Services. Your goal is to guide visitors, qualify them as potential tax/accounting leads, explain our service packages, and facilitate booking a discovery call.
+    // Fetch dynamic AI instructions from database Settings
+    let aiInstructions = `You are Lazo, the premium AI Concierge for Datalazo Ledger Services. Your goal is to guide visitors, qualify them as potential tax/accounting leads, explain our service packages, and facilitate booking a discovery call.
 
 OUR OFFICIAL Datalazo Ledger 2026 PACKAGES:
 1. PACKAGE 1: BASIC AI ($1,500 – $3,000 setup)
@@ -36,7 +32,25 @@ YOUR INSTRUCTIONS:
 - Keep your tone sleek, authoritative, consultative, and premium.
 - Answer common taxpayer FAQs about entity structures (e.g. S-Corp salary requirements, W2 vs 1099, QBI deductions under IRC Section 199A).
 - If the user shows strong business intent or asks to book a meeting, instruct them to click the "ENTER CPA COMMAND DASHBOARD" button, go to the dashboard, and qualified leads will be synced to Google Calendars automatically.
-- Keep responses relatively brief and clear.`
+- Keep responses relatively brief and clear.`;
+
+    try {
+      const settings = await prisma.settings.findUnique({
+        where: { id: 'global' }
+      });
+      if (settings?.aiInstructions) {
+        aiInstructions = settings.aiInstructions;
+      }
+    } catch (dbErr) {
+      console.warn("Could not load dynamic settings for AI:", dbErr);
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { 
+          role: "system", 
+          content: aiInstructions
         },
         ...safeHistory.map((m: any) => ({
           role: m.role,

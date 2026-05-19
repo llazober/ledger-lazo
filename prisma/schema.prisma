@@ -177,6 +177,7 @@ model Settings {
   twilioSid       String?
   twilioToken     String?
   googleCalUrl    String?
+  aiInstructions  String?  @db.Text
   updatedAt       DateTime @updatedAt
 }
 
