@@ -709,10 +709,18 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       }}
                       className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
                     />
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[10px] shrink-0 ${
-                      doc.fileType === 'PDF' ? 'bg-red-500/10 text-red-400' : 'bg-cyan-500/10 text-cyan-400'
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[8px] shrink-0 ${
+                      (doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF') 
+                        ? 'bg-rose-500/10 text-rose-400' 
+                        : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
+                        ? 'bg-blue-500/10 text-blue-400'
+                        : 'bg-cyan-500/10 text-cyan-400'
                     }`}>
-                      {doc.fileType}
+                      {(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF') 
+                        ? 'PDF' 
+                        : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
+                        ? 'DOCX'
+                        : doc.fileType.substring(0, 4).toUpperCase()}
                     </div>
                     <div className="overflow-hidden">
                       <div className="text-xs font-semibold text-white truncate">{doc.name}</div>
@@ -812,25 +820,36 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
               )}
 
               {/* Document Text / Preview Viewer */}
-              <div className="space-y-1.5 pt-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">File Content Preview</span>
+              {!(activeDoc.name.toLowerCase().endsWith('.docx') || activeDoc.name.toLowerCase().endsWith('.doc')) ? (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">File Content Preview</span>
+                    <button
+                      onClick={() => triggerFileDownloadWithSavePicker(activeDoc.id, activeDoc.name)}
+                      className="text-[9px] text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center gap-1 bg-cyan-900/20 px-2.5 py-1 rounded border border-cyan-500/20 transition-all hover:scale-105"
+                    >
+                      📥 Download Document
+                    </button>
+                  </div>
+                  <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 min-h-[140px] max-h-[200px] overflow-y-auto text-slate-800 font-mono text-[10px] leading-relaxed whitespace-pre-wrap shadow-inner relative select-text">
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-sans font-bold select-none">
+                      OCR TRANSCRIPT
+                    </div>
+                    {(!activeDoc.extractedText || activeDoc.extractedText.includes("RAW SCAN DATA:") || activeDoc.extractedText.includes("OCR Text could not be extracted")) 
+                      ? "No text could be extracted from this document." 
+                      : activeDoc.extractedText}
+                  </div>
+                </div>
+              ) : (
+                <div className="pt-2">
                   <button
                     onClick={() => triggerFileDownloadWithSavePicker(activeDoc.id, activeDoc.name)}
-                    className="text-[9px] text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center gap-1 bg-cyan-900/20 px-2.5 py-1 rounded border border-cyan-500/20 transition-all hover:scale-105"
+                    className="w-full text-xs text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center justify-center gap-1 bg-[#00f0ff]/5 py-3 rounded-xl border border-cyan-500/20 transition-all hover:scale-[1.01]"
                   >
-                    📥 Download Document
+                    📥 Download Word Document
                   </button>
                 </div>
-                <div className="bg-[#f8f9fa] border border-slate-200 rounded-xl p-4 min-h-[140px] max-h-[200px] overflow-y-auto text-slate-800 font-mono text-[10px] leading-relaxed whitespace-pre-wrap shadow-inner relative select-text">
-                  <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-sans font-bold select-none">
-                    OCR TRANSCRIPT
-                  </div>
-                  {(!activeDoc.extractedText || activeDoc.extractedText.includes("RAW SCAN DATA:") || activeDoc.extractedText.includes("OCR Text could not be extracted")) 
-                    ? "No text could be extracted from this document." 
-                    : activeDoc.extractedText}
-                </div>
-              </div>
+              )}
 
               {activeDoc.aiSummary && (
                 <div className="space-y-1.5 pt-1">
