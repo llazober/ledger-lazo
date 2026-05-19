@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from 'react';
+import JSZip from 'jszip';
 
 interface Document {
   id: string;
@@ -42,6 +43,61 @@ const readFileAsBase64 = (file: File): Promise<string> => {
     reader.onerror = (error) => reject(error);
   });
 };
+
+async function triggerFolderDownloadAsZip(docIds: string[], docNames: string[], archiveName: string = 'documents.zip') {
+  const zip = new JSZip();
+
+  const fetchPromises = docIds.map(async (docId, idx) => {
+    try {
+      const url = `/accounting/api/crm/document/download?docId=${docId}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch document ${docId}`);
+      const blob = await response.blob();
+      
+      const fileName = docNames[idx] || `document_${idx + 1}.pdf`;
+      zip.file(fileName, blob);
+    } catch (err) {
+      console.error(`Error adding file ${docId} to ZIP:`, err);
+    }
+  });
+
+  await Promise.all(fetchPromises);
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+  if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+    try {
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName: archiveName,
+        types: [{
+          description: 'ZIP Archive',
+          accept: {
+            'application/zip': ['.zip']
+          }
+        }]
+      });
+
+      const writable = await handle.createWritable();
+      await writable.write(zipBlob);
+      await writable.close();
+      return;
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return;
+      }
+      console.warn("showSaveFilePicker failed or was aborted. Falling back to standard download.", err);
+    }
+  }
+
+  const url = URL.createObjectURL(zipBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', archiveName);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 async function triggerFileDownloadWithSavePicker(docId: string, suggestedName: string) {
   const url = `/accounting/api/crm/document/download?docId=${docId}`;
@@ -103,14 +159,17 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     );
   };
 
-  const handleDownloadSelectedVault = () => {
-    selectedVaultDocs.forEach((docId, index) => {
+  const handleDownloadSelectedVault = async () => {
+    const docNames = selectedVaultDocs.map(docId => {
       const doc = docs.find(d => d.id === docId);
-      const name = doc ? doc.name : 'document.pdf';
-      setTimeout(() => {
-        triggerFileDownloadWithSavePicker(docId, name);
-      }, index * 600);
+      return doc ? doc.name : 'document.pdf';
     });
+    let archiveName = 'tax_documents.zip';
+    if (selectedClientId) {
+      const client = clients.find(c => c.id === selectedClientId);
+      if (client) archiveName = `${client.name}_tax_documents.zip`;
+    }
+    await triggerFolderDownloadAsZip(selectedVaultDocs, docNames, archiveName);
   };
   
   // RAG Chat States
