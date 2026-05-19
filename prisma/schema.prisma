@@ -46,6 +46,7 @@ model Client {
   taxYear             Int           @default(2026)
   status              String        @default("ONBOARDING") // ONBOARDING, MISSING_DOCS, IN_PREPARATION, REVIEW, COMPLETED
   assignedAccountantId String?
+  position            Int           @default(0)
   
   // Relations
   documents           Document[]

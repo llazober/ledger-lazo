@@ -15,7 +15,10 @@ export default async function DashboardPage() {
       include: {
         user: true
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [
+        { position: 'asc' },
+        { createdAt: 'desc' }
+      ]
     });
 
     // Serialize Dates to string to pass safely to Client Components

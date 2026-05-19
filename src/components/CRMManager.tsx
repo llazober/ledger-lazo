@@ -345,7 +345,42 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
 
     const client = clients.find(c => c.id === clientId);
     if (client && client.status !== targetStatus) {
-      handleUpdateClientStatus(clientId, targetStatus);
+      let updatedClients = [...clients];
+      const draggedIdx = updatedClients.findIndex(c => c.id === clientId);
+      if (draggedIdx !== -1) {
+        const [removed] = updatedClients.splice(draggedIdx, 1);
+        const oldStatus = removed.status;
+        removed.status = targetStatus;
+        
+        // Append to the end of target column
+        updatedClients.push(removed);
+        setClients(updatedClients);
+
+        // Recalculate positions for target status column and old status column
+        const targetClients = updatedClients.filter(c => c.status === targetStatus);
+        const oldClients = updatedClients.filter(c => c.status === oldStatus);
+
+        const positionsPayload = [
+          ...targetClients.map((c, idx) => ({ id: c.id, position: idx, status: targetStatus })),
+          ...oldClients.map((c, idx) => ({ id: c.id, position: idx, status: oldStatus }))
+        ];
+
+        startTransition(async () => {
+          try {
+            await fetch('/accounting/api/crm/client', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                clientId, 
+                status: targetStatus, 
+                positions: positionsPayload 
+              }),
+            });
+          } catch (err) {
+            console.error("Error updating client status via column drop:", err);
+          }
+        });
+      }
     }
     setDraggedClientId(null);
   };
@@ -362,28 +397,40 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     if (!draggedClient || !targetClient) return;
 
     const newStatus = targetClient.status;
-    const isStatusChanged = draggedClient.status !== newStatus;
 
     let updatedClients = [...clients];
     const draggedIdx = updatedClients.findIndex(c => c.id === draggedId);
     if (draggedIdx !== -1) {
       const [removed] = updatedClients.splice(draggedIdx, 1);
+      const oldStatus = removed.status;
       removed.status = newStatus;
+      
       const targetIdx = updatedClients.findIndex(c => c.id === targetClientId);
       updatedClients.splice(targetIdx, 0, removed);
       setClients(updatedClients);
-    }
 
-    if (isStatusChanged) {
+      // Recalculate positions for target status column and old status column (if different)
+      const targetClients = updatedClients.filter(c => c.status === newStatus);
+      const oldClients = oldStatus !== newStatus ? updatedClients.filter(c => c.status === oldStatus) : [];
+
+      const positionsPayload = [
+        ...targetClients.map((c, idx) => ({ id: c.id, position: idx, status: newStatus })),
+        ...oldClients.map((c, idx) => ({ id: c.id, position: idx, status: oldStatus }))
+      ];
+
       startTransition(async () => {
         try {
           await fetch('/accounting/api/crm/client', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clientId: draggedId, status: newStatus }),
+            body: JSON.stringify({ 
+              clientId: draggedId, 
+              status: newStatus, 
+              positions: positionsPayload 
+            }),
           });
         } catch (err) {
-          console.error("Error updating client status via drag:", err);
+          console.error("Error updating client positions via card drop:", err);
         }
       });
     }
@@ -692,7 +739,19 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                       <div className="cursor-pointer group/card" onClick={() => handleOpenConsole(client)}>
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase">{client.taxType}</span>
-                          <span className="text-[10px] text-slate-500 font-semibold">TY {client.taxYear}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-500 font-semibold">TY {client.taxYear}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClient(client.id);
+                              }}
+                              className="text-slate-500 hover:text-rose-400 text-[10px] transition-all p-0.5 rounded hover:bg-white/5"
+                              title="Delete Client"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                         <h4 className="font-bold text-white mt-2 leading-snug group-hover/card:text-[#00f0ff] transition-all flex items-center gap-1">
                           {client.user.name} <span className="opacity-0 group-hover/card:opacity-100 text-[10px]">⚙️</span>
@@ -701,30 +760,6 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                         <span className="text-[9px] text-[#00f0ff] font-bold block mt-2.5 bg-[#00f0ff]/5 border border-[#00f0ff]/10 rounded px-2 py-0.5 w-max hover:bg-[#00f0ff]/10 transition-all">
                           📂 Tax Console
                         </span>
-                      </div>
-
-                      <div className="pt-3 border-t border-white/5 flex flex-col gap-2 mt-4">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[9px] text-slate-500 block font-bold">MOVE STAGE:</span>
-                          <button
-                            onClick={() => handleDeleteClient(client.id)}
-                            className="text-[9px] text-rose-400 hover:text-rose-300 font-semibold px-1 py-0.5 rounded transition-all"
-                            title="Delete Client"
-                          >
-                            🗑️ Delete
-                          </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {columns.filter(c => c.key !== col.key).map(c => (
-                            <button
-                              key={c.key}
-                              onClick={() => handleUpdateClientStatus(client.id, c.key)}
-                              className="text-[9px] bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white px-1.5 py-1 rounded transition-all truncate text-center font-medium"
-                            >
-                              {c.label}
-                            </button>
-                          ))}
-                        </div>
                       </div>
                     </div>
                   ))}
