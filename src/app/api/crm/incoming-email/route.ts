@@ -198,7 +198,7 @@ export async function POST(req: Request) {
     const attachmentsList = attachments || [];
 
     for (const attach of attachmentsList) {
-      const { name, url, fileSize, fileType } = attach;
+      const { name, url, fileSize, fileType, data } = attach;
 
       // Safe parsing of fileSize to integer
       let parsedSize = 1024;
@@ -222,9 +222,9 @@ export async function POST(req: Request) {
       // Classify the document category using OpenAI
       const aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
 
-      // Download attachment binary to save in the database as base64 (Option 1)
-      let fileDataBase64: string | null = null;
-      if (url && url.startsWith('http')) {
+      // Save attachment binary (direct base64 from n8n or fetch from URL)
+      let fileDataBase64: string | null = data || null;
+      if (!fileDataBase64 && url && url.startsWith('http')) {
         try {
           console.log(`Downloading attachment binary from: ${url}`);
           const fileRes = await fetch(url);
