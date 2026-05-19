@@ -232,6 +232,10 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
   const [noteText, setNoteText] = useState('');
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Drag and Drop States
+  const [draggedClientId, setDraggedClientId] = useState<string | null>(null);
+  const [activeDragCol, setActiveDragCol] = useState<string | null>(null);
   
   // Client Tax Console Modal States
   const [selectedConsoleClient, setSelectedConsoleClient] = useState<Client | null>(null);
@@ -282,6 +286,79 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     });
     const clientName = selectedConsoleClient ? `${selectedConsoleClient.user.name} Merged.pdf` : 'merged.pdf';
     await triggerMergeDocuments(selectedConsoleDocs, docNames, clientName);
+  };
+
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, clientId: string) => {
+    setDraggedClientId(clientId);
+    e.dataTransfer.setData('text/plain', clientId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDragEnterCol = (e: React.DragEvent, colKey: string) => {
+    e.preventDefault();
+    setActiveDragCol(colKey);
+  };
+
+  const handleDragLeaveCol = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDropColumn = (e: React.DragEvent, targetStatus: string) => {
+    e.preventDefault();
+    setActiveDragCol(null);
+    const clientId = draggedClientId || e.dataTransfer.getData('text/plain');
+    if (!clientId) return;
+
+    const client = clients.find(c => c.id === clientId);
+    if (client && client.status !== targetStatus) {
+      handleUpdateClientStatus(clientId, targetStatus);
+    }
+    setDraggedClientId(null);
+  };
+
+  const handleCardDrop = (e: React.DragEvent, targetClientId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveDragCol(null);
+    const draggedId = draggedClientId || e.dataTransfer.getData('text/plain');
+    if (!draggedId || draggedId === targetClientId) return;
+
+    const draggedClient = clients.find(c => c.id === draggedId);
+    const targetClient = clients.find(c => c.id === targetClientId);
+    if (!draggedClient || !targetClient) return;
+
+    const newStatus = targetClient.status;
+    const isStatusChanged = draggedClient.status !== newStatus;
+
+    let updatedClients = [...clients];
+    const draggedIdx = updatedClients.findIndex(c => c.id === draggedId);
+    if (draggedIdx !== -1) {
+      const [removed] = updatedClients.splice(draggedIdx, 1);
+      removed.status = newStatus;
+      const targetIdx = updatedClients.findIndex(c => c.id === targetClientId);
+      updatedClients.splice(targetIdx, 0, removed);
+      setClients(updatedClients);
+    }
+
+    if (isStatusChanged) {
+      startTransition(async () => {
+        try {
+          await fetch('/accounting/api/crm/client', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clientId: draggedId, status: newStatus }),
+          });
+        } catch (err) {
+          console.error("Error updating client status via drag:", err);
+        }
+      });
+    }
+
+    setDraggedClientId(null);
   };
 
   const handleUploadTaxReturn = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -553,7 +630,18 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
           {columns.map(col => {
             const colClients = clients.filter(c => c.status === col.key);
             return (
-              <div key={col.key} className="flex flex-col min-w-[240px] space-y-4">
+              <div 
+                key={col.key} 
+                className={`flex flex-col min-w-[240px] space-y-4 rounded-2xl p-2 transition-all duration-200 ${
+                  activeDragCol === col.key 
+                    ? 'bg-[#00f0ff]/5 ring-2 ring-[#00f0ff]/20' 
+                    : 'bg-transparent'
+                }`}
+                onDragOver={handleDragOver}
+                onDragEnter={(e) => handleDragEnterCol(e, col.key)}
+                onDragLeave={handleDragLeaveCol}
+                onDrop={(e) => handleDropColumn(e, col.key)}
+              >
                 {/* Column Header */}
                 <div className={`p-4 border-l-2 rounded-xl flex justify-between items-center bg-white/[0.01] ${col.color} border-white/5`}>
                   <span className="font-bold text-xs tracking-wider uppercase text-slate-300">{col.label}</span>
@@ -563,7 +651,14 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                 {/* Card Container */}
                 <div className="flex-1 space-y-3 p-1">
                   {colClients.map(client => (
-                    <div key={client.id} className="glass p-4 space-y-3 glass-card-hover text-left flex flex-col justify-between">
+                    <div 
+                      key={client.id} 
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, client.id)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleCardDrop(e, client.id)}
+                      className="glass p-4 space-y-3 glass-card-hover text-left flex flex-col justify-between cursor-grab active:cursor-grabbing transition-all duration-150 hover:scale-[1.02]"
+                    >
                       <div className="cursor-pointer group/card" onClick={() => handleOpenConsole(client)}>
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase">{client.taxType}</span>

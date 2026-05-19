@@ -505,10 +505,5 @@ Penalty & Interest Calculated: $320.00
 Please send payment by Dec 15, 2025 to avoid further accumulation.`;
   }
 
-  return `RAW SCAN DATA:
-File: ${filename}
-Type: ${category}
-Timestamp: ${new Date().toISOString()}
---------------------------------------------------
-OCR Text could not be extracted in high confidence. Check original file upload.`;
+  return "No text could be extracted from this document.";
 }
