@@ -17,3 +17,30 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const clientId = searchParams.get('clientId');
+
+    if (!clientId) {
+      return NextResponse.json({ success: false, error: "clientId is required" }, { status: 400 });
+    }
+
+    const client = await prisma.client.findUnique({
+      where: { id: clientId }
+    });
+
+    if (client) {
+      // Deleting user Cascades and deletes the Client profile
+      await prisma.user.delete({
+        where: { id: client.userId }
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete Client Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

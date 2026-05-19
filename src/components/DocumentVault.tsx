@@ -36,6 +36,26 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
 
   const [isPending, startTransition] = useTransition();
 
+  const handleDeleteDoc = async (docId: string) => {
+    if (!confirm('Are you sure you want to delete this document?')) return;
+
+    // Optimistic UI updates
+    setDocs(prev => prev.filter(d => d.id !== docId));
+    if (activeDoc?.id === docId) {
+      setActiveDoc(docs.find(d => d.id !== docId) || null);
+    }
+
+    startTransition(async () => {
+      try {
+        await fetch(`/accounting/api/crm/document?docId=${docId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.error("Error deleting document:", err);
+      }
+    });
+  };
+
   // Stats
   const totalDocs = docs.length;
   const processedDocs = docs.filter(d => d.status === 'VALIDATED').length;
@@ -302,6 +322,17 @@ export default function DocumentVault({ initialDocs }: DocumentVaultProps) {
                     ) : (
                       <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">VALIDATED</span>
                     )}
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteDoc(doc.id);
+                      }}
+                      className="text-[10px] text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded transition-all font-bold"
+                      title="Delete Document"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 </div>
               ))}

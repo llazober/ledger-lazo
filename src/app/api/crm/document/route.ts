@@ -38,3 +38,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const docId = searchParams.get('docId');
+
+    if (!docId) {
+      return NextResponse.json({ success: false, error: "docId is required" }, { status: 400 });
+    }
+
+    await prisma.document.delete({
+      where: { id: docId }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete Document Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

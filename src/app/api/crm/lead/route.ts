@@ -105,3 +105,23 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const leadId = searchParams.get('leadId');
+
+    if (!leadId) {
+      return NextResponse.json({ success: false, error: "leadId is required" }, { status: 400 });
+    }
+
+    await prisma.lead.delete({
+      where: { id: leadId }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Delete Lead Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}

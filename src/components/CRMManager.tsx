@@ -120,6 +120,38 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     });
   };
 
+  const handleDeleteClient = async (clientId: string) => {
+    if (!confirm('Are you sure you want to delete this client profile and their user account?')) return;
+    
+    setClients(prev => prev.filter(c => c.id !== clientId));
+    
+    startTransition(async () => {
+      try {
+        await fetch(`/accounting/api/crm/client?clientId=${clientId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.error("Error deleting client:", err);
+      }
+    });
+  };
+
+  const handleDeleteLead = async (leadId: string) => {
+    if (!confirm('Are you sure you want to delete this lead?')) return;
+    
+    setLeads(prev => prev.filter(l => l.id !== leadId));
+    
+    startTransition(async () => {
+      try {
+        await fetch(`/accounting/api/crm/lead?leadId=${leadId}`, {
+          method: 'DELETE'
+        });
+      } catch (err) {
+        console.error("Error deleting lead:", err);
+      }
+    });
+  };
+
   const handleSaveNotes = async () => {
     if (!selectedLead) return;
     
@@ -270,9 +302,18 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                       </div>
 
                       <div className="pt-3 border-t border-white/5 flex flex-col gap-2 mt-4">
-                        <span className="text-[9px] text-slate-500 block">MOVE STAGE:</span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[9px] text-slate-500 block font-bold">MOVE STAGE:</span>
+                          <button
+                            onClick={() => handleDeleteClient(client.id)}
+                            className="text-[9px] text-rose-400 hover:text-rose-300 font-semibold px-1 py-0.5 rounded transition-all"
+                            title="Delete Client"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                         <div className="grid grid-cols-2 gap-1.5">
-                          {columns.filter(c => c.key !== col.key).slice(0, 2).map(c => (
+                          {columns.filter(c => c.key !== col.key).map(c => (
                             <button
                               key={c.key}
                               onClick={() => handleUpdateClientStatus(client.id, c.key)}
@@ -364,7 +405,15 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                         onClick={() => handleUpdateLeadStatus(lead.id, 'WON')}
                         className="px-3 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 border border-[#00f0ff]/20 text-[#00f0ff] text-xs font-bold rounded-lg transition-all"
                       >
-                        🏆 WON (Onboard)
+                        🏆 WON
+                      </button>
+
+                      <button 
+                        onClick={() => handleDeleteLead(lead.id)}
+                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-bold rounded-lg transition-all"
+                        title="Delete Lead"
+                      >
+                        🗑️ Delete
                       </button>
                     </td>
                   </tr>
