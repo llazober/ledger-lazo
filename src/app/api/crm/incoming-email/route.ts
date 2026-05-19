@@ -261,6 +261,14 @@ export async function POST(req: Request) {
         }
       }
 
+      let status = aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
+      let validationErrors = aiResult.validationErrors;
+
+      if (convertedFileType.toUpperCase() !== 'PDF') {
+        status = 'REVIEW_REQUIRED';
+        validationErrors = `Unsupported file format (${convertedFileType}). The vault requires documents to be in PDF format. Please convert this file to PDF.`;
+      }
+
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,
@@ -270,11 +278,11 @@ export async function POST(req: Request) {
           fileType: convertedFileType,
           taxYear: 2026,
           category: aiResult.category,
-          status: aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED',
+          status,
           extractedText: generateRealisticMockOCRText(convertedName, aiResult.category),
           aiSummary: aiResult.aiSummary,
           confidenceScore: aiResult.confidenceScore,
-          validationErrors: aiResult.validationErrors,
+          validationErrors,
           fileData: finalBase64
         }
       });
