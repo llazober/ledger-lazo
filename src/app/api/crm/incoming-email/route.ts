@@ -172,6 +172,25 @@ export async function POST(req: Request) {
     for (const attach of attachmentsList) {
       const { name, url, fileSize, fileType } = attach;
 
+      // Safe parsing of fileSize to integer
+      let parsedSize = 1024;
+      if (typeof fileSize === 'number') {
+        parsedSize = Math.round(fileSize);
+      } else if (typeof fileSize === 'string') {
+        const cleanSize = fileSize.replace(/[^0-9.]/g, '');
+        const num = parseFloat(cleanSize);
+        if (!isNaN(num)) {
+          const lower = fileSize.toLowerCase();
+          if (lower.includes('kb') || lower.includes('k')) {
+            parsedSize = Math.round(num * 1024);
+          } else if (lower.includes('mb') || lower.includes('m')) {
+            parsedSize = Math.round(num * 1024 * 1024);
+          } else {
+            parsedSize = Math.round(num);
+          }
+        }
+      }
+
       // Classify the document category using OpenAI
       const aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
 
@@ -180,7 +199,7 @@ export async function POST(req: Request) {
           clientId: client.id,
           name,
           url: url || '#',
-          fileSize: fileSize || 1024,
+          fileSize: parsedSize,
           fileType: fileType || 'PDF',
           taxYear: 2026,
           category: aiResult.category,
