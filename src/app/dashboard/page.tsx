@@ -21,6 +21,21 @@ export default async function DashboardPage() {
       ]
     });
 
+    const staff = await prisma.user.findMany({
+      where: {
+        role: {
+          in: ['FIRM_ADMIN', 'ACCOUNTANT']
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true
+      },
+      orderBy: { name: 'asc' }
+    });
+
     // Serialize Dates to string to pass safely to Client Components
     const serializedLeads = leads.map((lead: any) => ({
       ...lead,
@@ -57,7 +72,8 @@ export default async function DashboardPage() {
 
         <CRMManager 
           initialLeads={serializedLeads} 
-          initialClients={serializedClients} 
+          initialClients={serializedClients}
+          initialStaff={staff} 
         />
       </div>
     );

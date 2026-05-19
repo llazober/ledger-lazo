@@ -19,7 +19,15 @@ interface Client {
   taxType: string;
   taxYear: number;
   status: string; // ONBOARDING, MISSING_DOCS, IN_PREPARATION, REVIEW, COMPLETED
+  assignedAccountantId?: string | null;
   createdAt: string;
+}
+
+interface Staff {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }
 
 interface Lead {
@@ -220,11 +228,13 @@ async function triggerFileDownloadWithSavePicker(docId: string, suggestedName: s
 interface CRMManagerProps {
   initialLeads: Lead[];
   initialClients: Client[];
+  initialStaff?: Staff[];
 }
 
-export default function CRMManager({ initialLeads, initialClients }: CRMManagerProps) {
+export default function CRMManager({ initialLeads, initialClients, initialStaff = [] }: CRMManagerProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [clients, setClients] = useState<Client[]>(initialClients);
+  const [staff] = useState<Staff[]>(initialStaff);
   const [activeTab, setActiveTab] = useState<'pipeline' | 'leads'>('pipeline');
   
   // Modals and Details State
@@ -562,6 +572,23 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
     });
   };
 
+  const handleAssignAccountant = async (clientId: string, accountantId: string) => {
+    // Optimistic update
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, assignedAccountantId: accountantId || null } : c));
+    
+    startTransition(async () => {
+      try {
+        await fetch('/accounting/api/crm/client', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId, assignedAccountantId: accountantId || "" }),
+        });
+      } catch (err) {
+        console.error("Error assigning accountant:", err);
+      }
+    });
+  };
+
   const handleDeleteLead = async (leadId: string) => {
     if (!confirm('Are you sure you want to delete this lead?')) return;
     
@@ -760,6 +787,23 @@ export default function CRMManager({ initialLeads, initialClients }: CRMManagerP
                         <span className="text-[9px] text-[#00f0ff] font-bold block mt-2.5 bg-[#00f0ff]/5 border border-[#00f0ff]/10 rounded px-2 py-0.5 w-max hover:bg-[#00f0ff]/10 transition-all">
                           📂 Tax Console
                         </span>
+                      </div>
+                      
+                      {/* Assignee Selector Dropdown */}
+                      <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between gap-2">
+                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Assigned:</label>
+                        <select
+                          value={client.assignedAccountantId || ""}
+                          onChange={(e) => handleAssignAccountant(client.id, e.target.value)}
+                          className="bg-[#0a0a0c] border border-white/10 hover:border-[#00f0ff]/30 text-[10px] text-slate-300 focus:text-white rounded-lg px-2 py-1 focus:outline-none focus:border-[#00f0ff] transition-all w-full max-w-[130px] truncate"
+                        >
+                          <option value="">👤 Unassigned</option>
+                          {staff.map(s => (
+                            <option key={s.id} value={s.id}>
+                              👤 {s.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   ))}

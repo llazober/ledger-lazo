@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { clientId, status, positions } = body;
+    const { clientId, status, positions, assignedAccountantId } = body;
 
     if (positions && Array.isArray(positions)) {
       // Transaction to update all positions & statuses
@@ -48,7 +48,10 @@ export async function PATCH(req: Request) {
 
     const client = await prisma.client.update({
       where: { id: clientId },
-      data: { status },
+      data: { 
+        ...(status && { status }),
+        ...(assignedAccountantId !== undefined && { assignedAccountantId: assignedAccountantId || null })
+      },
       include: { user: true }
     });
 
