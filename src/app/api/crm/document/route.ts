@@ -41,9 +41,19 @@ export async function POST(req: Request) {
             (global as any).DOMMatrix = class {};
           }
           const pdfParseModule = require('pdf-parse');
-          const pdfParse = typeof pdfParseModule === 'function' ? pdfParseModule : pdfParseModule.default;
-          const pdfData = await pdfParse(fileBuffer);
-          rawText = pdfData.text || '';
+          const PDFParseClass = pdfParseModule.PDFParse;
+          
+          if (PDFParseClass) {
+            // PDF-parse v2 uses a class constructor and expects Uint8Array
+            const parser = new PDFParseClass(new Uint8Array(fileBuffer));
+            const result = await parser.getText();
+            rawText = result.text || '';
+          } else {
+            // PDF-parse v1 uses direct function execution
+            const pdfParse = typeof pdfParseModule === 'function' ? pdfParseModule : pdfParseModule.default;
+            const pdfData = await pdfParse(fileBuffer);
+            rawText = pdfData.text || '';
+          }
         } catch (pdfErr: any) {
           console.error("PDF parse failed:", pdfErr);
           rawText = `[Error parsing PDF file: ${pdfErr.message}]`;
