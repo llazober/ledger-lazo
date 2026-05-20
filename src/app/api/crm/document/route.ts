@@ -40,7 +40,8 @@ export async function POST(req: Request) {
           if (typeof (global as any).DOMMatrix === 'undefined') {
             (global as any).DOMMatrix = class {};
           }
-          const pdfParse = require('pdf-parse');
+          const pdfParseModule = require('pdf-parse');
+          const pdfParse = typeof pdfParseModule === 'function' ? pdfParseModule : pdfParseModule.default;
           const pdfData = await pdfParse(fileBuffer);
           rawText = pdfData.text || '';
         } catch (pdfErr: any) {
