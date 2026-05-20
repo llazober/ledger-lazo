@@ -78,7 +78,81 @@ YOUR INSTRUCTIONS:
         console.warn("Could not load dynamic settings for AI:", dbErr);
       }
 
-      aiInstructions = `${aiInstructions}${knowledgePrompt}`;
+      // Look up client process status from database based on email or name keywords
+      let clientStatusContext = "";
+      try {
+        const keywords: string[] = [];
+        const textsToAnalyze = [message];
+        if (safeHistory && safeHistory.length > 0) {
+          const lastMessages = safeHistory.slice(-4).map((h: any) => h.content || "");
+          textsToAnalyze.push(...lastMessages);
+        }
+        const combinedText = textsToAnalyze.join(" ");
+
+        const emailMatches = combinedText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+        if (emailMatches) {
+          keywords.push(...emailMatches);
+        }
+
+        const words = combinedText.split(/\s+/).map((w: string) => w.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()).filter((w: string) => w.length > 2);
+
+        const clients = await prisma.client.findMany({
+          include: {
+            user: true,
+            documents: {
+              select: {
+                name: true,
+                category: true,
+                status: true
+              }
+            }
+          }
+        });
+
+        const matchedClients = clients.filter(c => {
+          const emailLower = c.user.email.toLowerCase();
+          const nameLower = c.user.name.toLowerCase();
+          const companyLower = (c.companyName || "").toLowerCase();
+
+          if (emailMatches && emailMatches.some(email => emailLower.includes(email.toLowerCase()))) {
+            return true;
+          }
+
+          return words.some(w => {
+            if (['the', 'and', 'for', 'status', 'process', 'client', 'company', 'name', 'mail', 'email', 'lazo'].includes(w)) {
+              return false;
+            }
+            return nameLower.includes(w) || companyLower.includes(w) || emailLower.includes(w);
+          });
+        });
+
+        if (matchedClients.length > 0) {
+          clientStatusContext = matchedClients.map(c => {
+            const docSummary = c.documents.map(d => `- ${d.name} (${d.category}, Status: ${d.status})`).join('\n');
+            return `Client Name: ${c.user.name}
+Email: ${c.user.email}
+Company: ${c.companyName || 'N/A'}
+Tax Type: ${c.taxType}
+Current Process Stage: ${c.status}
+Status Explanation:
+- ONBOARDING: Currently onboarding/setting up their portal.
+- MISSING_DOCS: Waiting for required tax documents. We have requested outstanding paperwork.
+- IN_PREPARATION: Accountant is preparing their returns.
+- REVIEW: Completed and ready for client sign-off.
+- COMPLETED: Client signed and filing is completed.
+Uploaded Documents:
+${docSummary || 'None.'}`;
+          }).join('\n\n');
+        }
+      } catch (err) {
+        console.warn("Error looking up client status in database:", err);
+      }
+
+      if (clientStatusContext) {
+        aiInstructions = `${aiInstructions}${knowledgePrompt}\n\nMATCHING CLIENT DATABASE RECORDS:\n${clientStatusContext}\n\nINSTRUCTION: The user has queried status. Use this real-time database record to give a helpful, precise update. Rephrase status keys nicely (e.g. IN_PREPARATION -> In Preparation).`;
+      } else {
+        aiInstructions = `${aiInstructions}${knowledgePrompt}\n\nINSTRUCTION: If the user asks about their process, onboarding, or tax status, politely ask them to provide their email address or company name so you can check their real-time file status in the database.`;
+      }
     }
 
     const response = await openai.chat.completions.create({
