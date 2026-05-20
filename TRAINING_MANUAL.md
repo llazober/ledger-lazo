@@ -97,7 +97,31 @@ When tax returns are completed by the accountant, they are moved to `REVIEW` and
 
 ---
 
-## 5. 🔌 How to Import Workflows into n8n
+## 5. 🤖 RAG Tax Assistant & Client Status Chatbot
+
+The platform includes a context-aware chatbot (Lazo) powered by OpenAI GPT-4o-mini and a custom RAG (Retrieval-Augmented Generation) search framework.
+
+### 📖 RAG IRC Reference Engine
+The RAG framework allows accountants and taxpayers to cross-reference client document vaults against the Internal Revenue Code (IRC) and tax regulations:
+* **Indexed Tax Code Reference**: System-wide global documents (stored with `clientId: null`) are uploaded to contain official guidelines for Section 162 (ordinary/necessary business expenses), Section 179 (depreciation expensing), Section 199A (Qualified Business Income eligibility), and Clean Vehicle tax credits.
+* **Smart Parsing & Chunking**: When a document is ingested, it is broken down into semantic chunks and stored in the `DocumentChunk` table.
+* **Vector Similarity & Keyword Fallback**: 
+  * If an OpenAI API key is configured, the system uses `text-embedding-3-small` vector embeddings to match queries to tax guidelines.
+  * If the OpenAI API key is missing or encounters authorization limits, the engine gracefully falls back to a custom **local keyword frequency matcher** (using word-frequency weight analysis in Javascript), keeping the RAG search functional.
+
+### 🔍 Automated Deduction Scanners
+* The AI engine continuously scans bank statements and 1099-NEC documents to automatically identify tax-saving opportunities.
+* Discovered opportunities are summarized under `aiSummary` and any warnings or recommendations are flagged in `validationErrors`.
+* This updates the document status to `REVIEW_REQUIRED` and displays live alert cards directly inside the **RAG Tax Assistant** dashboard page for CPAs to review.
+
+### 💬 Client Process Status Lookup
+* The chatbot Lazo is available on the landing page and dashboard.
+* **Lookup Intent**: If a user asks about their process, onboarding status, or documents, Lazo requests their email address or company name.
+* **Dynamic Search**: When the user provides this information, the chat API searches the database `Client` and `User` models, pulls the current stage (e.g. `IN_PREPARATION`, `MISSING_DOCS`), lists any uploaded files, and reports the status report in a friendly, conversational manner.
+
+---
+
+## 6. 🔌 How to Import Workflows into n8n
 
 Follow these steps to import the configured workflow files into your n8n workspace:
 
