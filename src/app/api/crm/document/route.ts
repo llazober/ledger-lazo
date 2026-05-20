@@ -43,6 +43,32 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PATCH(req: Request) {
+  try {
+    const body = await req.json();
+    const { docId, category, extractedText, aiSummary, taxYear } = body;
+
+    if (!docId) {
+      return NextResponse.json({ success: false, error: "docId is required" }, { status: 400 });
+    }
+
+    const document = await prisma.document.update({
+      where: { id: docId },
+      data: {
+        ...(category && { category }),
+        ...(extractedText !== undefined && { extractedText }),
+        ...(aiSummary && { aiSummary }),
+        ...(taxYear && { taxYear: parseInt(taxYear) })
+      }
+    });
+
+    return NextResponse.json({ success: true, document });
+  } catch (error: any) {
+    console.error('Update Document Error:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);

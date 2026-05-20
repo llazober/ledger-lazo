@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useEffect } from 'react';
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 
@@ -233,6 +233,61 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const [isDragging, setIsDragging] = useState(false);
   const [activeDoc, setActiveDoc] = useState<Document | null>(initialDocs[0] || null);
   const [selectedVaultDocs, setSelectedVaultDocs] = useState<string[]>([]);
+
+  // States for manual OCR editing
+  const [editedCategory, setEditedCategory] = useState('');
+  const [editedText, setEditedText] = useState('');
+  const [isSavingEdits, setIsSavingEdits] = useState(false);
+
+  useEffect(() => {
+    if (activeDoc) {
+      setEditedCategory(activeDoc.category);
+      setEditedText(activeDoc.extractedText || '');
+    } else {
+      setEditedCategory('');
+      setEditedText('');
+    }
+  }, [activeDoc]);
+
+  const handleSaveOCREdits = async () => {
+    if (!activeDoc) return;
+    setIsSavingEdits(true);
+    try {
+      const res = await fetch('/accounting/api/crm/document', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          docId: activeDoc.id,
+          category: editedCategory,
+          extractedText: editedText
+        })
+      });
+
+      if (!res.ok) throw new Error("Failed to update document");
+      const data = await res.json();
+
+      // Update local state list
+      setDocs(prev => prev.map(d => d.id === activeDoc.id ? {
+        ...d,
+        category: editedCategory,
+        extractedText: editedText
+      } : d));
+
+      // Update active document state
+      setActiveDoc(prev => prev && prev.id === activeDoc.id ? {
+        ...prev,
+        category: editedCategory,
+        extractedText: editedText
+      } : prev);
+
+      alert("OCR document text updated successfully!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to save document corrections.");
+    } finally {
+      setIsSavingEdits(false);
+    }
+  };
 
   const handleToggleVaultDocSelection = (docId: string) => {
     setSelectedVaultDocs(prev => 
@@ -881,6 +936,55 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   </p>
                 </div>
               )}
+
+              {/* Manual OCR review & corrections */}
+              <div className="space-y-3 pt-3 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Manual OCR Corrections</span>
+                  <span className="text-[9px] text-slate-400 font-medium">Verify or adjust extracted text below</span>
+                </div>
+                
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[8px] text-slate-500 font-bold block mb-1">DOCUMENT CATEGORY</label>
+                    <select
+                      value={editedCategory}
+                      onChange={(e) => setEditedCategory(e.target.value)}
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl text-xs px-3 py-2 text-white font-semibold focus:outline-none focus:border-[#00f0ff] transition-all"
+                    >
+                      <option value="W2">W2 - Wage & Tax Statement</option>
+                      <option value="1099-NEC">1099-NEC - Nonemployee Compensation</option>
+                      <option value="1099-SSA">1099-SSA - Social Security Benefits</option>
+                      <option value="1099-INT">1099-INT - Interest Income</option>
+                      <option value="1099-DIV">1099-DIV - Dividends & Distributions</option>
+                      <option value="1099-MISC">1099-MISC - Miscellaneous Income</option>
+                      <option value="Bank_Statement">Bank Statement</option>
+                      <option value="Receipt">Receipt</option>
+                      <option value="Tax_Notice">Tax Notice</option>
+                      <option value="UNCLASSIFIED">Unclassified</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[8px] text-slate-500 font-bold block mb-1">OCR EXTRACTED TEXT</label>
+                    <textarea
+                      value={editedText}
+                      onChange={(e) => setEditedText(e.target.value)}
+                      rows={4}
+                      className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl text-xs p-3 text-slate-300 font-mono focus:outline-none focus:border-[#00f0ff] transition-all resize-y"
+                      placeholder="No OCR text extracted yet. Type or paste document text here..."
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveOCREdits}
+                  disabled={isSavingEdits}
+                  className="w-full text-[10px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center justify-center gap-1.5 bg-emerald-500/5 py-2.5 rounded-xl border border-emerald-500/20 transition-all hover:bg-emerald-500/10 disabled:opacity-50 uppercase tracking-wider"
+                >
+                  {isSavingEdits ? 'Saving Corrections...' : '💾 Save OCR Edits'}
+                </button>
+              </div>
             </div>
           )}
 
