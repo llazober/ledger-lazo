@@ -456,9 +456,11 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       let convertedSize = size;
       let convertedExtension = extension;
       let fileDataBase64: string | null = null;
+      let originalImageBase64: string | null = null;
 
       if (isImage) {
         try {
+          originalImageBase64 = await readFileAsBase64(file);
           const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as ArrayBuffer);
@@ -513,6 +515,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
             fileSize: convertedSize,
             fileType: convertedExtension,
             fileData: fileDataBase64,
+            originalImage: originalImageBase64,
             clientId: selectedClientId || null
           })
         });

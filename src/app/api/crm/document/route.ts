@@ -16,6 +16,7 @@ export async function POST(req: Request) {
       confidenceScore: clientConfidenceScore, 
       validationErrors: clientValidationErrors,
       fileData,
+      originalImage,
       clientId
     } = body;
 
@@ -35,7 +36,31 @@ export async function POST(req: Request) {
       const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(fileExt) ||
                       /\.(png|jpe?g|webp|gif)$/i.test(name || '');
 
-      if (isPdf) {
+      // Prioritize originalImage if it was uploaded as a raw image and converted client-side
+      if (originalImage && process.env.OPENAI_API_KEY) {
+        try {
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { type: 'text', text: 'Transcribe all visible text from this document image. Focus on capturing numbers, labels, forms fields, employer names, wages, and social security benefit values precisely.' },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:image/png;base64,${originalImage}`
+                    }
+                  }
+                ]
+              }
+            ]
+          });
+          rawText = response.choices[0].message?.content || '';
+        } catch (visionErr) {
+          console.error("OpenAI vision parse failed on originalImage:", visionErr);
+        }
+      } else if (isPdf) {
         try {
           if (typeof (global as any).DOMMatrix === 'undefined') {
             (global as any).DOMMatrix = class {};
@@ -87,6 +112,10 @@ export async function POST(req: Request) {
         extractedText = rawText;
         status = 'VALIDATED';
 
+        // Check if the parsed text is extremely short, indicating a scanned PDF
+        const cleanText = rawText.replace(/[\s\-\d]/g, '');
+        const isLikelyScannedPdf = isPdf && cleanText.length < 50;
+
         if (process.env.OPENAI_API_KEY) {
           try {
             const prompt = `You are an expert CPA Tax Assistant.
@@ -115,6 +144,13 @@ Format your output as a JSON object with keys:
             aiSummary = result.aiSummary || aiSummary;
             confidenceScore = result.confidenceScore || confidenceScore;
             validationErrors = result.validationErrors || validationErrors;
+
+            if (isLikelyScannedPdf) {
+              aiSummary = (aiSummary || '') + " (Note: This appears to be a scanned document with limited text overlay. For full OCR transcription, please save it as a PNG/JPG image file and upload it again.)";
+              if (!validationErrors) {
+                validationErrors = "Scanned document detected. Standard text layer is empty. Check manually or upload as PNG/JPG image.";
+              }
+            }
           } catch (openaiErr) {
             console.error("OpenAI processing of raw text failed:", openaiErr);
           }
