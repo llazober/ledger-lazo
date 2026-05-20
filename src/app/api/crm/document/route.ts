@@ -116,7 +116,16 @@ export async function POST(req: Request) {
         const cleanText = rawText.replace(/[\s\-\d]/g, '');
         const isLikelyScannedPdf = isPdf && cleanText.length < 50;
 
-        if (process.env.OPENAI_API_KEY) {
+        if (isLikelyScannedPdf) {
+          aiSummary = "Scanned document detected. Standard text layer is empty. Please upload as a PNG/JPG image file for full OCR transcription.";
+          validationErrors = "Scanned document detected. Standard text layer is empty. Check manually or upload as PNG/JPG image.";
+        }
+
+        const hasOpenAI = process.env.OPENAI_API_KEY && 
+                          process.env.OPENAI_API_KEY !== 'missing_api_key' &&
+                          process.env.OPENAI_API_KEY !== 'dummy_key_for_build_time';
+
+        if (hasOpenAI) {
           try {
             const prompt = `You are an expert CPA Tax Assistant.
 Analyze the following raw OCR text extracted from an uploaded client document:
@@ -141,15 +150,14 @@ Format your output as a JSON object with keys:
 
             const result = JSON.parse(response.choices[0].message?.content || '{}');
             category = result.category || category;
-            aiSummary = result.aiSummary || aiSummary;
             confidenceScore = result.confidenceScore || confidenceScore;
-            validationErrors = result.validationErrors || validationErrors;
 
             if (isLikelyScannedPdf) {
-              aiSummary = (aiSummary || '') + " (Note: This appears to be a scanned document with limited text overlay. For full OCR transcription, please save it as a PNG/JPG image file and upload it again.)";
-              if (!validationErrors) {
-                validationErrors = "Scanned document detected. Standard text layer is empty. Check manually or upload as PNG/JPG image.";
-              }
+              aiSummary = (result.aiSummary || '') + " (Note: This appears to be a scanned document with limited text overlay. For full OCR transcription, please save it as a PNG/JPG image file and upload it again.)";
+              validationErrors = result.validationErrors || "Scanned document detected. Standard text layer is empty. Check manually or upload as PNG/JPG image.";
+            } else {
+              aiSummary = result.aiSummary || aiSummary;
+              validationErrors = result.validationErrors || validationErrors;
             }
           } catch (openaiErr) {
             console.error("OpenAI processing of raw text failed:", openaiErr);
