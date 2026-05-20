@@ -503,7 +503,34 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       setDocs(prev => [tempDoc, ...prev]);
       setActiveDoc(tempDoc);
 
-      // Simulate n8n/AI asynchronous OCR classification in 3 seconds
+      // Attempt real server-side OCR parsing first
+      try {
+        const res = await fetch('/accounting/api/crm/document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: convertedName,
+            fileSize: convertedSize,
+            fileType: convertedExtension,
+            fileData: fileDataBase64,
+            clientId: selectedClientId || null
+          })
+        });
+
+        if (!res.ok) throw new Error("Server OCR failed");
+        const data = await res.json();
+
+        if (data.success && data.document) {
+          // Replace temp doc with real server-parsed document
+          setDocs(prev => prev.map(d => d.id === newDocId ? data.document : d));
+          setActiveDoc(data.document);
+          return;
+        }
+      } catch (err) {
+        console.warn("Server OCR upload failed, falling back to client simulation:", err);
+      }
+
+      // Simulate n8n/AI asynchronous OCR classification in 3 seconds as a fallback
       setTimeout(async () => {
         let category = 'Receipt';
         let extractedText = 'Invoice: #89281\nTotal: $120.50\nVendor: AWS Services';
