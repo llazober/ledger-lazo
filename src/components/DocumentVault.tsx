@@ -461,6 +461,11 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
           extractedText = 'Form W-2 Wage and Tax Statement 2025\nBox 1 Wages: $94,500.00\nBox 2 Federal Income Tax withheld: $14,200.00\nEmployer: Google Inc';
           aiSummary = 'W-2 Wage Statement from Google Inc for tax year 2025. Wages: $94,500.00, Federal tax withheld: $14,200.00.';
           confidenceScore = 0.98;
+        } else if (name.toLowerCase().includes('ss-1099') || name.toLowerCase().includes('ssa-1099') || name.toLowerCase().includes('social security') || name.toLowerCase().includes('ssa')) {
+          category = '1099-SSA';
+          extractedText = 'Form SSA-1099 Social Security Benefit Statement\nBox 3 Benefits Paid: $19,500.00\nBox 4 Federal Income Tax Withheld: $1,050.00\nBox 5 Net Benefits for 2026: $18,450.00\nRecipient: Luis Lazo';
+          aiSummary = 'Social Security Benefit Statement Form SSA-1099. Net benefits paid: $18,450.00. Federal income tax withheld: $1,050.00.';
+          confidenceScore = 0.99;
         } else if (name.toLowerCase().includes('1099')) {
           category = '1099-NEC';
           extractedText = 'Form 1099-NEC Nonemployee Compensation\nBox 1: $12,000.00\nPayer: Upwork Inc\nRecipient: Luis Lazo';
