@@ -37,6 +37,9 @@ export async function POST(req: Request) {
 
       if (isPdf) {
         try {
+          if (typeof (global as any).DOMMatrix === 'undefined') {
+            (global as any).DOMMatrix = class {};
+          }
           const pdfParse = require('pdf-parse');
           const pdfData = await pdfParse(fileBuffer);
           rawText = pdfData.text || '';
