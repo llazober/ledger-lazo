@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { message, history } = await req.json();
+    const { message, history, documentContext } = await req.json();
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ 
@@ -34,15 +34,34 @@ YOUR INSTRUCTIONS:
 - If the user shows strong business intent or asks to book a meeting, instruct them to click the "ENTER CPA COMMAND DASHBOARD" button, go to the dashboard, and qualified leads will be synced to Google Calendars automatically.
 - Keep responses relatively brief and clear.`;
 
-    try {
-      const settings = await prisma.settings.findUnique({
-        where: { id: 'global' }
-      });
-      if (settings?.aiInstructions) {
-        aiInstructions = settings.aiInstructions;
+    if (documentContext) {
+      aiInstructions = `You are Lazo, the premium AI Document Assistant for Datalazo Ledger Services.
+You are helping an accountant query and inspect a client's tax document.
+
+ACTIVE DOCUMENT CONTEXT:
+Document Name: ${documentContext.name}
+Category: ${documentContext.category}
+Extracted Text (OCR Content):
+---
+${documentContext.extractedText || "No text extracted from this document."}
+---
+
+YOUR INSTRUCTIONS:
+- Answer the user's question accurately using ONLY the information found in the extracted text above.
+- Be concise, professional, and clear.
+- If the user asks about specific fields (e.g. Box 1, Box 5, net benefits, wages), look for those specific labels or numbers in the extracted text and report them exactly.
+- If the information is not in the text, politely state that you cannot find it in this document.`;
+    } else {
+      try {
+        const settings = await prisma.settings.findUnique({
+          where: { id: 'global' }
+        });
+        if (settings?.aiInstructions) {
+          aiInstructions = settings.aiInstructions;
+        }
+      } catch (dbErr) {
+        console.warn("Could not load dynamic settings for AI:", dbErr);
       }
-    } catch (dbErr) {
-      console.warn("Could not load dynamic settings for AI:", dbErr);
     }
 
     const response = await openai.chat.completions.create({
