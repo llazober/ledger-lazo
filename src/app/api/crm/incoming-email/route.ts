@@ -530,7 +530,7 @@ Penalty & Interest Calculated: $320.00
 Please send payment by Dec 15, 2025 to avoid further accumulation.`;
   }
 
-  return "No text could be extracted from this document.";
+  return "";
 }
 
 async function convertImageToPdfServer(buffer: Buffer, filename: string): Promise<{ pdfBuffer: Buffer, pdfName: string }> {

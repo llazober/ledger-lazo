@@ -1005,7 +1005,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       onChange={(e) => setEditedText(e.target.value)}
                       rows={4}
                       className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl text-xs p-3 text-slate-300 font-mono focus:outline-none focus:border-[#00f0ff] transition-all resize-y"
-                      placeholder="No OCR text extracted yet. Type or paste document text here..."
+                      placeholder="No text could be extracted from this document."
                     />
                   </div>
                 </div>
