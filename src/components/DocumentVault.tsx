@@ -446,9 +446,11 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
 
       const isImage = ['PNG', 'JPG', 'JPEG'].includes(extension);
       const isPdf = extension === 'PDF';
+      const isDocx = ['DOCX', 'DOC'].includes(extension);
+      const isTxt = extension === 'TXT';
 
-      if (!isPdf && !isImage) {
-        alert(`File "${name}" is not supported. Only PDF and image files (PNG, JPG, JPEG) are allowed in the vault. Image files will be automatically converted to PDF.`);
+      if (!isPdf && !isImage && !isDocx && !isTxt) {
+        alert(`File "${name}" is not supported. Supported files: PDF, PNG, JPG, JPEG, DOCX, TXT.`);
         return;
       }
 
@@ -631,6 +633,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       }));
 
       const documentContext = activeDoc ? {
+        id: activeDoc.id,
         name: activeDoc.name,
         category: activeDoc.category,
         extractedText: activeDoc.extractedText
@@ -755,7 +758,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
               </div>
               <div>
                 <h4 className="text-white font-bold text-sm">Drag and drop tax files here</h4>
-                <p className="text-slate-400 text-[10px] mt-1">Supports PDF, PNG, or JPG files up to 25MB. Mock OCR triggers instantly.</p>
+                <p className="text-slate-400 text-[10px] mt-1">Supports PDF, PNG, JPG, DOCX, or TXT files up to 25MB. Mock OCR triggers instantly.</p>
               </div>
             </div>
           </div>

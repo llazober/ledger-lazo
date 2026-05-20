@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
+import mammoth from 'mammoth';
+import { processDocumentChunks } from '@/lib/ai-processor';
 
 export async function POST(req: Request) {
   try {
@@ -33,11 +35,27 @@ export async function POST(req: Request) {
       
       const fileExt = fileType?.toLowerCase() || '';
       const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+      const isDocx = fileExt === 'docx' || name?.toLowerCase().endsWith('.docx') || name?.toLowerCase().endsWith('.doc');
+      const isTxt = fileExt === 'txt' || name?.toLowerCase().endsWith('.txt');
       const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(fileExt) ||
                       /\.(png|jpe?g|webp|gif)$/i.test(name || '');
 
-      // Prioritize originalImage if it was uploaded as a raw image and converted client-side
-      if (originalImage && process.env.OPENAI_API_KEY) {
+      if (isTxt) {
+        try {
+          rawText = fileBuffer.toString('utf-8');
+        } catch (txtErr: any) {
+          console.error("TXT parse failed:", txtErr);
+          rawText = `[Error parsing text file: ${txtErr.message}]`;
+        }
+      } else if (isDocx) {
+        try {
+          const result = await mammoth.extractRawText({ buffer: fileBuffer });
+          rawText = result.value || '';
+        } catch (docxErr: any) {
+          console.error("DOCX parse failed:", docxErr);
+          rawText = `[Error parsing Word file: ${docxErr.message}]`;
+        }
+      } else if (originalImage && process.env.OPENAI_API_KEY) {
         try {
           const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -184,6 +202,15 @@ Format your output as a JSON object with keys:
       }
     });
 
+    // Generate RAG chunks and embeddings
+    if (extractedText) {
+      try {
+        await processDocumentChunks(document.id, extractedText);
+      } catch (chunkErr) {
+        console.error("Failed to generate document chunks on create:", chunkErr);
+      }
+    }
+
     return NextResponse.json({ success: true, document });
   } catch (error: any) {
     console.error('Create Document Log Error:', error);
@@ -209,6 +236,15 @@ export async function PATCH(req: Request) {
         ...(taxYear && { taxYear: parseInt(taxYear) })
       }
     });
+
+    // Re-generate RAG chunks and embeddings if the text has been edited manually
+    if (extractedText !== undefined) {
+      try {
+        await processDocumentChunks(docId, extractedText);
+      } catch (chunkErr) {
+        console.error("Failed to update document chunks after PATCH:", chunkErr);
+      }
+    }
 
     return NextResponse.json({ success: true, document });
   } catch (error: any) {

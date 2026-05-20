@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { openai } from '@/lib/openai';
 import { prisma } from '@/lib/prisma';
+import { searchKnowledge } from '@/lib/knowledge';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,24 +35,38 @@ YOUR INSTRUCTIONS:
 - If the user shows strong business intent or asks to book a meeting, instruct them to click the "ENTER CPA COMMAND DASHBOARD" button, go to the dashboard, and qualified leads will be synced to Google Calendars automatically.
 - Keep responses relatively brief and clear.`;
 
+    let knowledgePrompt = "";
     if (documentContext) {
+      // 1. Attempt RAG vector matching for specific document
+      const knowledge = await searchKnowledge(message, documentContext.id);
+      if (knowledge) {
+        knowledgePrompt = `\n\nRELEVANT DOCUMENT EXCERPTS:\n${knowledge}\n\nUse these excerpts to answer the user's question.`;
+      } else {
+        // Fallback to active document full text (capped to prevent token overflow)
+        const fallbackText = documentContext.extractedText?.slice(0, 5000) || "No text extracted from this document.";
+        knowledgePrompt = `\n\nACTIVE DOCUMENT TEXT:\n${fallbackText}\n\nUse this text to answer the user's question.`;
+      }
+
       aiInstructions = `You are Lazo, the premium AI Document Assistant for Datalazo Ledger Services.
 You are helping an accountant query and inspect a client's tax document.
 
-ACTIVE DOCUMENT CONTEXT:
+ACTIVE DOCUMENT DETAILS:
 Document Name: ${documentContext.name}
 Category: ${documentContext.category}
-Extracted Text (OCR Content):
----
-${documentContext.extractedText || "No text extracted from this document."}
----
+${knowledgePrompt}
 
 YOUR INSTRUCTIONS:
-- Answer the user's question accurately using ONLY the information found in the extracted text above.
+- Answer the user's question accurately using the document information provided above.
 - Be concise, professional, and clear.
-- If the user asks about specific fields (e.g. Box 1, Box 5, net benefits, wages), look for those specific labels or numbers in the extracted text and report them exactly.
-- If the information is not in the text, politely state that you cannot find it in this document.`;
+- If the user asks about specific fields (e.g. Box 1, Box 5, net benefits, wages), report them exactly as they appear.
+- If the information is not in the text/excerpts, politely state that you cannot find it in this document.`;
     } else {
+      // Concierge chat: general RAG search across knowledge base
+      const knowledge = await searchKnowledge(message);
+      if (knowledge) {
+        knowledgePrompt = `\n\nRELEVANT KNOWLEDGE BASE INFORMATION:\n${knowledge}\n\nUse this information to answer the question if applicable.`;
+      }
+
       try {
         const settings = await prisma.settings.findUnique({
           where: { id: 'global' }
@@ -62,6 +77,8 @@ YOUR INSTRUCTIONS:
       } catch (dbErr) {
         console.warn("Could not load dynamic settings for AI:", dbErr);
       }
+
+      aiInstructions = `${aiInstructions}${knowledgePrompt}`;
     }
 
     const response = await openai.chat.completions.create({
