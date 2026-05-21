@@ -55,8 +55,9 @@ export async function POST(req: Request) {
           console.error("DOCX parse failed:", docxErr);
           rawText = `[Error parsing Word file: ${docxErr.message}]`;
         }
-      } else if (originalImage && process.env.OPENAI_API_KEY) {
+      } else if ((isImage || originalImage) && process.env.OPENAI_API_KEY) {
         try {
+          const imgBase64 = originalImage || fileData;
           const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
                   {
                     type: 'image_url',
                     image_url: {
-                      url: `data:image/png;base64,${originalImage}`
+                      url: `data:image/${fileExt || 'png'};base64,${imgBase64}`
                     }
                   }
                 ]
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
           });
           rawText = response.choices[0].message?.content || '';
         } catch (visionErr) {
-          console.error("OpenAI vision parse failed on originalImage:", visionErr);
+          console.error("OpenAI vision parse failed on image:", visionErr);
         }
       } else if (isPdf) {
         try {
@@ -100,29 +101,6 @@ export async function POST(req: Request) {
         } catch (pdfErr: any) {
           console.error("PDF parse failed:", pdfErr);
           rawText = `[Error parsing PDF file: ${pdfErr.message}]`;
-        }
-      } else if (isImage && process.env.OPENAI_API_KEY) {
-        try {
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'user',
-                content: [
-                  { type: 'text', text: 'Transcribe all visible text from this document image. Focus on capturing numbers, labels, forms fields, employer names, wages, and social security benefit values precisely.' },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:image/${fileExt || 'png'};base64,${fileData}`
-                    }
-                  }
-                ]
-              }
-            ]
-          });
-          rawText = response.choices[0].message?.content || '';
-        } catch (visionErr) {
-          console.error("OpenAI vision parse failed:", visionErr);
         }
       }
 

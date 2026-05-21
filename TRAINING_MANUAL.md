@@ -26,17 +26,18 @@ Clients and leads progress through the following database-tracked stages:
 
 The Document Vault manages taxpayer source files, audits, downloads, and merges.
 
-### 📁 Allowed Ingestion Formats
-To maintain a clean and standardized database, **only PDF documents are kept in the final vault**.
-*   **Automatic Image-to-PDF Conversion**: 
-    *   If a client uploads image formats (`PNG`, `JPG`, `JPEG`), the vault uses `pdf-lib` to convert them into a single-page PDF **on the fly**.
-    *   Un-supported files (e.g. `.xlsx`, `.docx`) uploaded directly to the vault will be blocked with an warning alert.
+### 📁 Ingestion Formats & Vision OCR
+The vault supports both digital PDFs and raw images (`PNG`, `JPG`, `JPEG`, `WEBP`).
+*   **Direct Vision OCR Transcription**: 
+    *   To prevent text extraction failures common in scanned documents, raw images are processed directly by the **OpenAI GPT-4o-mini Vision API**.
+    *   This extracts precise field data (employer info, wages, dates, amounts) from the visual layout of the image.
+    *   Un-supported files (e.g., `.xlsx`) are blocked with a warning alert.
 
 ### ⚡ Batch Actions
 Select multiple documents using the checkbox triggers to perform batch operations:
-*   **Batch Download (ZIP)**: Compiles all selected PDF files into a single, downloadable ZIP file to prevent multiple browser save-dialog prompts.
-*   **Batch PDF Merge**: Merges all selected PDF documents into a single, multi-page PDF document.
-*   *Note: Non-PDF documents selected in batch actions are skipped automatically with a user notice.*
+*   **Batch Download (ZIP)**: Compiles all selected PDF and image files into a single, downloadable ZIP archive.
+*   **Batch PDF Merge**: Merges all selected PDF and image documents into a single, multi-page PDF document (images are automatically embedded and scaled to fit the page margin).
+*   *Note: Non-supported file formats (like docx) selected in batch actions are skipped automatically with a user notice.*
 
 ---
 

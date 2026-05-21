@@ -300,17 +300,21 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const handleDownloadSelectedVault = async () => {
     const validDocs = selectedVaultDocs.filter(docId => {
       const doc = docs.find(d => d.id === docId);
-      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
-      return isPdf;
+      if (!doc) return false;
+      const fileTypeUpper = doc.fileType.toUpperCase();
+      const isPdf = doc.name.toLowerCase().endsWith('.pdf') || fileTypeUpper === 'PDF';
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) || 
+                      /\.(png|jpe?g|webp)$/i.test(doc.name);
+      return isPdf || isImage;
     });
 
     if (validDocs.length === 0) {
-      alert("No PDF files selected for download. Non-PDF files are excluded from batch operations.");
+      alert("No PDF or image files selected for download. Non-supported files are excluded from batch operations.");
       return;
     }
 
     if (validDocs.length < selectedVaultDocs.length) {
-      alert(`Skipping ${selectedVaultDocs.length - validDocs.length} non-PDF document(s) from the batch download.`);
+      alert(`Skipping ${selectedVaultDocs.length - validDocs.length} unsupported document(s) from the batch download.`);
     }
 
     const docNames = validDocs.map(docId => {
@@ -328,17 +332,21 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const handleMergeSelectedVault = async () => {
     const validDocs = selectedVaultDocs.filter(docId => {
       const doc = docs.find(d => d.id === docId);
-      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
-      return isPdf;
+      if (!doc) return false;
+      const fileTypeUpper = doc.fileType.toUpperCase();
+      const isPdf = doc.name.toLowerCase().endsWith('.pdf') || fileTypeUpper === 'PDF';
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) || 
+                      /\.(png|jpe?g|webp)$/i.test(doc.name);
+      return isPdf || isImage;
     });
 
     if (validDocs.length === 0) {
-      alert("No PDF files selected for merging. Non-PDF files are excluded from batch operations.");
+      alert("No PDF or image files selected for merging. Non-supported files are excluded from batch operations.");
       return;
     }
 
     if (validDocs.length < selectedVaultDocs.length) {
-      alert(`Skipping ${selectedVaultDocs.length - validDocs.length} non-PDF document(s) from the merge.`);
+      alert(`Skipping ${selectedVaultDocs.length - validDocs.length} unsupported document(s) from the merge.`);
     }
 
     const docNames = validDocs.map(docId => {
@@ -402,35 +410,6 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     setIsDragging(false);
   };
 
-  const convertImageToPdf = async (arrayBuffer: ArrayBuffer, fileName: string): Promise<{ pdfBytes: Uint8Array, pdfName: string }> => {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
-
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    let img;
-    if (extension === 'png') {
-      img = await pdfDoc.embedPng(arrayBuffer);
-    } else {
-      img = await pdfDoc.embedJpg(arrayBuffer);
-    }
-
-    const imgDims = img.scaleToFit(width - 40, height - 40);
-    
-    page.drawImage(img, {
-      x: (width - imgDims.width) / 2,
-      y: (height - imgDims.height) / 2,
-      width: imgDims.width,
-      height: imgDims.height,
-    });
-
-    const pdfBytes = await pdfDoc.save();
-    const baseName = fileName.substring(0, fileName.lastIndexOf('.'));
-    const pdfName = `${baseName}.pdf`;
-
-    return { pdfBytes, pdfName };
-  };
-
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -444,7 +423,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       const size = file.size;
       const extension = name.split('.').pop()?.toUpperCase() || 'PDF';
 
-      const isImage = ['PNG', 'JPG', 'JPEG'].includes(extension);
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(extension);
       const isPdf = extension === 'PDF';
       const isDocx = ['DOCX', 'DOC'].includes(extension);
       const isTxt = extension === 'TXT';
@@ -462,24 +441,11 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
 
       if (isImage) {
         try {
-          originalImageBase64 = await readFileAsBase64(file);
-          const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as ArrayBuffer);
-            reader.onerror = (err) => reject(err);
-            reader.readAsArrayBuffer(file);
-          });
-
-          const { pdfBytes, pdfName } = await convertImageToPdf(arrayBuffer, name);
-          const pdfBlob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-          
-          convertedName = pdfName;
-          convertedSize = pdfBlob.size;
-          convertedExtension = 'PDF';
-          fileDataBase64 = await readFileAsBase64(pdfBlob);
+          fileDataBase64 = await readFileAsBase64(file);
+          originalImageBase64 = fileDataBase64;
         } catch (err) {
-          console.error("Error converting image to PDF client-side:", err);
-          alert(`Error converting image "${name}" to PDF.`);
+          console.error("Error reading image file:", err);
+          alert(`Error reading image "${name}".`);
           return;
         }
       } else {

@@ -246,19 +246,11 @@ export async function POST(req: Request) {
       let finalBase64 = fileDataBase64;
 
       const attachmentExtension = name.split('.').pop()?.toLowerCase() || '';
-      const isImage = ['png', 'jpg', 'jpeg'].includes(attachmentExtension);
+      const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(attachmentExtension) ||
+                      /\.(png|jpe?g|webp|gif)$/i.test(name || '');
 
-      if (isImage && finalBase64) {
-        try {
-          const imgBuffer = Buffer.from(finalBase64, 'base64');
-          const { pdfBuffer, pdfName } = await convertImageToPdfServer(imgBuffer, name);
-          convertedName = pdfName;
-          convertedSize = pdfBuffer.length;
-          convertedFileType = 'PDF';
-          finalBase64 = pdfBuffer.toString('base64');
-        } catch (err) {
-          console.error("Error converting image attachment to PDF on server:", err);
-        }
+      if (isImage) {
+        convertedFileType = attachmentExtension.toUpperCase();
       }
 
       const status = aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
@@ -305,6 +297,29 @@ export async function POST(req: Request) {
             }
           } catch (pdfErr: any) {
             console.error("PDF parse failed:", pdfErr);
+          }
+        } else if (isImage && process.env.OPENAI_API_KEY) {
+          try {
+            const response = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: 'Transcribe all visible text from this document image. Focus on capturing numbers, labels, forms fields, employer names, wages, and social security benefit values precisely.' },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:image/${fileExt || 'png'};base64,${finalBase64}`
+                      }
+                    }
+                  ]
+                }
+              ]
+            });
+            extractedText = response.choices[0].message?.content || '';
+          } catch (visionErr) {
+            console.error("OpenAI vision parse failed for email attachment:", visionErr);
           }
         }
       }
