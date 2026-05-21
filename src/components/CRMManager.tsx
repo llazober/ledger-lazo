@@ -789,21 +789,38 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                         </span>
                       </div>
                       
-                      {/* Assignee Selector Dropdown */}
-                      <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between gap-2">
-                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Assigned:</label>
-                        <select
-                          value={client.assignedAccountantId || ""}
-                          onChange={(e) => handleAssignAccountant(client.id, e.target.value)}
-                          className="bg-[#0a0a0c] border border-white/10 hover:border-[#00f0ff]/30 text-[10px] text-slate-300 focus:text-white rounded-lg px-2 py-1 focus:outline-none focus:border-[#00f0ff] transition-all w-full max-w-[130px] truncate"
-                        >
-                          <option value="">👤 Unassigned</option>
-                          {staff.map(s => (
-                            <option key={s.id} value={s.id}>
-                              👤 {s.name}
-                            </option>
-                          ))}
-                        </select>
+                      {/* Assignee & Stage Selector Dropdowns */}
+                      <div className="mt-3 pt-2.5 border-t border-white/5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Assigned:</label>
+                          <select
+                            value={client.assignedAccountantId || ""}
+                            onChange={(e) => handleAssignAccountant(client.id, e.target.value)}
+                            className="bg-[#0a0a0c] border border-white/10 hover:border-[#00f0ff]/30 text-[10px] text-slate-300 focus:text-white rounded-lg px-2 py-1 focus:outline-none focus:border-[#00f0ff] transition-all w-full max-w-[130px] truncate"
+                          >
+                            <option value="">👤 Unassigned</option>
+                            {staff.map(s => (
+                              <option key={s.id} value={s.id}>
+                                👤 {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Stage:</label>
+                          <select
+                            value={client.status}
+                            onChange={(e) => handleUpdateClientStatus(client.id, e.target.value)}
+                            className="bg-[#0a0a0c] border border-white/10 hover:border-[#00f0ff]/30 text-[10px] text-slate-300 focus:text-white rounded-lg px-2 py-1 focus:outline-none focus:border-[#00f0ff] transition-all w-full max-w-[130px] truncate"
+                          >
+                            {columns.map(col => (
+                              <option key={col.key} value={col.key}>
+                                📋 {col.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
                   ))}
