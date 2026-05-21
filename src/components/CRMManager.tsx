@@ -572,6 +572,62 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
     });
   };
 
+  const handleMoveClientPosition = async (clientId: string, direction: 'up' | 'down') => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return;
+
+    const status = client.status;
+    const sameStatusClients = clients.filter(c => c.status === status);
+    const indexInCol = sameStatusClients.findIndex(c => c.id === clientId);
+
+    if (indexInCol === -1) return;
+
+    let targetIdx = -1;
+    if (direction === 'up' && indexInCol > 0) {
+      targetIdx = indexInCol - 1;
+    } else if (direction === 'down' && indexInCol < sameStatusClients.length - 1) {
+      targetIdx = indexInCol + 1;
+    } else {
+      return;
+    }
+
+    const reorderedClients = [...sameStatusClients];
+    const [removed] = reorderedClients.splice(indexInCol, 1);
+    reorderedClients.splice(targetIdx, 0, removed);
+
+    let reorderedColIdx = 0;
+    const updatedClients = clients.map(c => {
+      if (c.status === status) {
+        return reorderedClients[reorderedColIdx++];
+      }
+      return c;
+    });
+
+    setClients(updatedClients);
+
+    const positionsPayload = reorderedClients.map((c, idx) => ({
+      id: c.id,
+      position: idx,
+      status: status
+    }));
+
+    startTransition(async () => {
+      try {
+        await fetch('/accounting/api/crm/client', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId,
+            status,
+            positions: positionsPayload
+          }),
+        });
+      } catch (err) {
+        console.error("Error updating client position via buttons:", err);
+      }
+    });
+  };
+
   const handleAssignAccountant = async (clientId: string, accountantId: string) => {
     // Optimistic update
     setClients(prev => prev.map(c => c.id === clientId ? { ...c, assignedAccountantId: accountantId || null } : c));
@@ -766,8 +822,28 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                       <div className="cursor-pointer group/card" onClick={() => handleOpenConsole(client)}>
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-xs bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase">{client.taxType}</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-slate-500 font-semibold">TY {client.taxYear}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-500 font-semibold mr-1">TY {client.taxYear}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveClientPosition(client.id, 'up');
+                              }}
+                              className="text-slate-500 hover:text-[#00f0ff] text-[11px] transition-all p-0.5 rounded hover:bg-white/5"
+                              title="Move Up"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMoveClientPosition(client.id, 'down');
+                              }}
+                              className="text-slate-500 hover:text-[#00f0ff] text-[11px] transition-all p-0.5 rounded hover:bg-white/5"
+                              title="Move Down"
+                            >
+                              ▼
+                            </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
