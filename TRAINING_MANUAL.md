@@ -71,7 +71,7 @@ Upon ingestion, the endpoint sends files to OpenAI GPT-4o-mini to:
 1.  Verify if the document is readable.
 2.  Classify the document type (e.g. `Bank_Statement`, `Tax_Notice`, `W2`, `1099-NEC`).
 3.  Store metadata and a summary directly in the database.
-4.  *Note: Emailed images are converted into PDFs server-side before database storage.*
+4.  *Note: Emailed images are stored natively in their raw image format (PNG, JPG, JPEG, WEBP) to preserve visual layout fidelity for direct OpenAI Vision API OCR processing.*
 
 ### 📋 Modular Tax Completeness Audit
 The system automatically compares received files against configured requirements for the client's `taxType`:
