@@ -78,6 +78,7 @@ model Document {
   fileData         String?         @db.Text // Base64 encoded file contents (for database storage)
   
   chunks           DocumentChunk[]
+  w2Data           W2Data?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -193,4 +194,25 @@ model TokenUsage {
   totalTokens      Int      @default(0)
   cost             Float    @default(0.0)
   createdAt        DateTime @default(now())
+}
+
+// 10. Automated W-2 Extracted Fields for Data Entry Integration
+model W2Data {
+  id                  String   @id @default(cuid())
+  documentId          String   @unique
+  document            Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  employeeSsn         String?  // Box a: Employee's social security number
+  employerEin         String?  // Box b: Employer identification number (EIN)
+  wages               Float?   // Box 1: Wages, tips, other compensation
+  fedIncomeTax        Float?   // Box 2: Federal income tax withheld
+  socialSecurityWages Float?   // Box 3: Social security wages
+  socialSecurityTax   Float?   // Box 4: Social security tax withheld
+  medicareWages       Float?   // Box 5: Medicare wages and tips
+  medicareTax         Float?   // Box 6: Medicare tax withheld
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([documentId])
 }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
 import mammoth from 'mammoth';
-import { processDocumentChunks } from '@/lib/ai-processor';
+import { processDocumentChunks, extractAndSaveW2Data } from '@/lib/ai-processor';
 
 export async function POST(req: Request) {
   try {
@@ -187,6 +187,15 @@ Format your output as a JSON object with keys:
       } catch (chunkErr) {
         console.error("Failed to generate document chunks on create:", chunkErr);
       }
+
+      // If document is W2, extract W2 fields
+      if (document.category === 'W2') {
+        try {
+          await extractAndSaveW2Data(document.id, extractedText);
+        } catch (w2Err) {
+          console.error("Failed to extract W2 data on create:", w2Err);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, document });
@@ -221,6 +230,18 @@ export async function PATCH(req: Request) {
         await processDocumentChunks(docId, extractedText);
       } catch (chunkErr) {
         console.error("Failed to update document chunks after PATCH:", chunkErr);
+      }
+    }
+
+    // Extract W-2 fields if category is W2 and we have text
+    if (document.category === 'W2') {
+      const activeText = extractedText !== undefined ? extractedText : document.extractedText;
+      if (activeText) {
+        try {
+          await extractAndSaveW2Data(docId, activeText);
+        } catch (w2Err) {
+          console.error("Failed to extract W2 data after PATCH:", w2Err);
+        }
       }
     }
 

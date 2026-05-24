@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
 import { auditClientDocuments } from '@/lib/taxRules';
 import { PDFDocument } from 'pdf-lib';
-import { processDocumentChunks } from '@/lib/ai-processor';
+import { processDocumentChunks, extractAndSaveW2Data } from '@/lib/ai-processor';
 
 // Dynamic document classifier using OpenAI GPT-4o-mini (falls back to regex rules)
 async function classifyDocumentWithAI(
@@ -362,6 +362,15 @@ export async function POST(req: Request) {
           await processDocumentChunks(doc.id, extractedText);
         } catch (chunkErr) {
           console.error("Failed to generate document chunks for email attachment:", chunkErr);
+        }
+
+        // If the document is classified as W2, run the W-2 field extractor
+        if (doc.category === 'W2') {
+          try {
+            await extractAndSaveW2Data(doc.id, extractedText);
+          } catch (w2Err) {
+            console.error("Failed to extract W2 data for email attachment:", w2Err);
+          }
         }
       }
 
