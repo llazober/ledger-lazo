@@ -338,20 +338,6 @@ export async function POST(req: Request) {
       // Clean up extractedText whitespace
       extractedText = extractedText.trim();
 
-      // Convert image to PDF server-side for database storage if needed
-      if (isImage && finalBase64) {
-        try {
-          const imageBuffer = Buffer.from(finalBase64, 'base64');
-          const { pdfBuffer, pdfName } = await convertImageToPdfServer(imageBuffer, name);
-          finalBase64 = pdfBuffer.toString('base64');
-          convertedName = pdfName;
-          convertedSize = pdfBuffer.length;
-          convertedFileType = 'PDF';
-        } catch (convErr) {
-          console.error("Failed to convert image to PDF server-side:", convErr);
-        }
-      }
-
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,
