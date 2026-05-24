@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
 import { auditClientDocuments } from '@/lib/taxRules';
 import { PDFDocument } from 'pdf-lib';
+import { processDocumentChunks } from '@/lib/ai-processor';
 
 // Dynamic document classifier using OpenAI GPT-4o-mini (falls back to regex rules)
 async function classifyDocumentWithAI(
@@ -142,12 +143,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "fromEmail is required" }, { status: 400 });
     }
 
+    // Clean and normalize email address
+    let cleanEmail = fromEmail.trim().toLowerCase();
+    const emailMatch = cleanEmail.match(/<([^>]+)>/);
+    if (emailMatch) {
+      cleanEmail = emailMatch[1].trim().toLowerCase();
+    }
+
     const emailSubject = subject || '';
     const emailBody = bodyText || '';
 
     // 1. Find or auto-provision User and Client
     let user = await prisma.user.findUnique({
-      where: { email: fromEmail }
+      where: { email: cleanEmail }
     });
 
     let onboardedNewUser = false;
@@ -156,8 +164,8 @@ export async function POST(req: Request) {
       // Auto-create User profile
       user = await prisma.user.create({
         data: {
-          email: fromEmail,
-          name: fromName || fromEmail.split('@')[0],
+          email: cleanEmail,
+          name: fromName || cleanEmail.split('@')[0],
           passwordHash: "$2b$10$vN9m21U1qC24V4z87V5MJuN1qC24V4z87V5MJuNz39281nS1z.dKe", // Mock temp password
           role: 'CLIENT_USER',
           isActive: true
@@ -196,10 +204,11 @@ export async function POST(req: Request) {
 
     // 2. Process attachments and perform AI classification
     const createdDocuments = [];
-    const attachmentsList = attachments || [];
+    const attachmentsList = attachments || body.attachment || body.files || body.file || [];
 
     for (const attach of attachmentsList) {
-      const { name, url, fileSize, fileType, data } = attach;
+      const { name, url, fileSize, fileType } = attach;
+      const data = attach.data || attach.base64Data || attach.fileData || attach.content;
 
       // Safe parsing of fileSize to integer
       let parsedSize = 1024;
@@ -258,20 +267,21 @@ export async function POST(req: Request) {
 
       let extractedText = '';
       if (finalBase64) {
-        const fileBuffer = Buffer.from(finalBase64, 'base64');
-        const fileExt = convertedFileType?.toLowerCase() || '';
-        const isPdf = fileExt === 'pdf' || convertedName?.toLowerCase().endsWith('.pdf');
-        const isDocx = fileExt === 'docx' || convertedName?.toLowerCase().endsWith('.docx') || convertedName?.toLowerCase().endsWith('.doc');
-        const isTxt = fileExt === 'txt' || convertedName?.toLowerCase().endsWith('.txt');
+        const fileExt = attachmentExtension || '';
+        const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+        const isDocx = ['docx', 'doc'].includes(fileExt) || name?.toLowerCase().endsWith('.docx') || name?.toLowerCase().endsWith('.doc');
+        const isTxt = fileExt === 'txt' || name?.toLowerCase().endsWith('.txt');
 
         if (isTxt) {
           try {
+            const fileBuffer = Buffer.from(finalBase64, 'base64');
             extractedText = fileBuffer.toString('utf-8');
           } catch (txtErr: any) {
             console.error("TXT parse failed:", txtErr);
           }
         } else if (isDocx) {
           try {
+            const fileBuffer = Buffer.from(finalBase64, 'base64');
             const mammoth = require('mammoth');
             const result = await mammoth.extractRawText({ buffer: fileBuffer });
             extractedText = result.value || '';
@@ -280,6 +290,7 @@ export async function POST(req: Request) {
           }
         } else if (isPdf) {
           try {
+            const fileBuffer = Buffer.from(finalBase64, 'base64');
             if (typeof (global as any).DOMMatrix === 'undefined') {
               (global as any).DOMMatrix = class {};
             }
@@ -327,6 +338,20 @@ export async function POST(req: Request) {
       // Clean up extractedText whitespace
       extractedText = extractedText.trim();
 
+      // Convert image to PDF server-side for database storage if needed
+      if (isImage && finalBase64) {
+        try {
+          const imageBuffer = Buffer.from(finalBase64, 'base64');
+          const { pdfBuffer, pdfName } = await convertImageToPdfServer(imageBuffer, name);
+          finalBase64 = pdfBuffer.toString('base64');
+          convertedName = pdfName;
+          convertedSize = pdfBuffer.length;
+          convertedFileType = 'PDF';
+        } catch (convErr) {
+          console.error("Failed to convert image to PDF server-side:", convErr);
+        }
+      }
+
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,
@@ -344,6 +369,15 @@ export async function POST(req: Request) {
           fileData: finalBase64
         }
       });
+
+      // Generate RAG chunks and embeddings so it is indexed for search
+      if (extractedText) {
+        try {
+          await processDocumentChunks(doc.id, extractedText);
+        } catch (chunkErr) {
+          console.error("Failed to generate document chunks for email attachment:", chunkErr);
+        }
+      }
 
       createdDocuments.push(doc);
     }
@@ -394,6 +428,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
+
 
 
 async function convertImageToPdfServer(buffer: Buffer, filename: string): Promise<{ pdfBuffer: Buffer, pdfName: string }> {
