@@ -90,7 +90,20 @@ const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?:
     { label: "Box 3: Benefits Paid", key: "benefitsPaid", isMonetary: true },
     { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
     { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true }
+  ],
+  "1099-R": [
+    { label: "Payer's federal identification number", key: "payerEin", isMono: true },
+    { label: "Recipient's identification number", key: "recipientSsn", isMono: true },
+    { label: "Box 1: Gross Distribution", key: "grossDistribution", isMonetary: true },
+    { label: "Box 2a: Taxable Amount", key: "taxableAmount", isMonetary: true },
+    { label: "Box 4: Federal Income Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 7: Distribution Code", key: "distributionCode", isMono: true },
+    { label: "Box 8: Other Income", key: "otherIncome", isMonetary: true },
+    { label: "Box 14: State Tax Withheld", key: "stateIncomeTax", isMonetary: true },
+    { label: "Box 16: State Distribution", key: "stateDistribution", isMonetary: true },
+
   ]
+
 };
 
 const readFileAsBase64 = (file: File | Blob): Promise<string> => {
@@ -114,7 +127,7 @@ async function triggerFolderDownloadAsZip(docIds: string[], docNames: string[], 
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Failed to fetch document ${docId}`);
       const blob = await response.blob();
-      
+
       const fileName = docNames[idx] || `document_${idx + 1}.pdf`;
       zip.file(fileName, blob);
     } catch (err) {
@@ -181,7 +194,7 @@ async function triggerMergeDocuments(docIds: string[], docNames: string[], outpu
       } else if (extension === 'png' || extension === 'jpg' || extension === 'jpeg') {
         const page = mergedPdf.addPage();
         const { width, height } = page.getSize();
-        
+
         let img;
         if (extension === 'png') {
           img = await mergedPdf.embedPng(arrayBuffer);
@@ -244,7 +257,7 @@ async function triggerMergeDocuments(docIds: string[], docNames: string[], outpu
 
 async function triggerFileDownloadWithSavePicker(docId: string, suggestedName: string) {
   const url = `/accounting/api/crm/document/download?docId=${docId}`;
-  
+
   if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
     try {
       const response = await fetch(url);
@@ -367,7 +380,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
         const errorData = await res.json();
         throw new Error(errorData.error || "Reprocessing failed");
       }
-      
+
       const data = await res.json();
 
       if (data.success && data.document) {
@@ -406,9 +419,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   };
 
   const handleToggleVaultDocSelection = (docId: string) => {
-    setSelectedVaultDocs(prev => 
-      prev.includes(docId) 
-        ? prev.filter(id => id !== docId) 
+    setSelectedVaultDocs(prev =>
+      prev.includes(docId)
+        ? prev.filter(id => id !== docId)
         : [...prev, docId]
     );
   };
@@ -419,8 +432,8 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       if (!doc) return false;
       const fileTypeUpper = doc.fileType.toUpperCase();
       const isPdf = doc.name.toLowerCase().endsWith('.pdf') || fileTypeUpper === 'PDF';
-      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) || 
-                      /\.(png|jpe?g|webp)$/i.test(doc.name);
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) ||
+        /\.(png|jpe?g|webp)$/i.test(doc.name);
       return isPdf || isImage;
     });
 
@@ -451,8 +464,8 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       if (!doc) return false;
       const fileTypeUpper = doc.fileType.toUpperCase();
       const isPdf = doc.name.toLowerCase().endsWith('.pdf') || fileTypeUpper === 'PDF';
-      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) || 
-                      /\.(png|jpe?g|webp)$/i.test(doc.name);
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) ||
+        /\.(png|jpe?g|webp)$/i.test(doc.name);
       return isPdf || isImage;
     });
 
@@ -476,7 +489,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     }
     await triggerMergeDocuments(validDocs, docNames, outputName);
   };
-  
+
   // RAG Chat States
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
@@ -507,8 +520,8 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   };
 
   // Filter docs based on client selection
-  const filteredDocs = selectedClientId 
-    ? docs.filter(d => d.clientId === selectedClientId) 
+  const filteredDocs = selectedClientId
+    ? docs.filter(d => d.clientId === selectedClientId)
     : docs;
 
   // Stats
@@ -529,10 +542,10 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
-    
+
     files.forEach(async (file) => {
       const newDocId = 'doc_' + Math.random().toString(36).substr(2, 9);
       const name = file.name;
@@ -822,15 +835,14 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
         {/* Left Side: Upload & File list (7 cols) */}
         <div className="lg:col-span-7 flex flex-col space-y-6">
           {/* Drag & Drop Zone */}
-          <div 
+          <div
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300 ${
-              isDragging 
-                ? 'border-[#00f0ff] bg-[#00f0ff]/5 shadow-[0_0_20px_rgba(0,240,255,0.08)]' 
-                : 'border-white/10 bg-white/[0.01] hover:border-[#00f0ff]/30 hover:bg-white/[0.02]'
-            }`}
+            className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all duration-300 ${isDragging
+              ? 'border-[#00f0ff] bg-[#00f0ff]/5 shadow-[0_0_20px_rgba(0,240,255,0.08)]'
+              : 'border-white/10 bg-white/[0.01] hover:border-[#00f0ff]/30 hover:bg-white/[0.02]'
+              }`}
           >
             <div className="flex flex-col items-center justify-center space-y-3">
               <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 shadow-lg">
@@ -885,7 +897,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   </div>
                 )}
               </div>
-              
+
               {/* Client Filter Dropdown */}
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-slate-500 font-bold uppercase">Filter Client:</span>
@@ -903,18 +915,17 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                 </select>
               </div>
             </div>
-            
+
             <div className="divide-y divide-white/5 overflow-y-auto max-h-[350px]">
               {filteredDocs.map(doc => (
-                <div 
+                <div
                   key={doc.id}
                   onClick={() => setActiveDoc(doc)}
-                  className={`p-4 flex justify-between items-center cursor-pointer transition-all hover:bg-white/[0.01] ${
-                    activeDoc?.id === doc.id ? 'bg-[#00f0ff]/5 border-l-2 border-[#00f0ff]' : ''
-                  }`}
+                  className={`p-4 flex justify-between items-center cursor-pointer transition-all hover:bg-white/[0.01] ${activeDoc?.id === doc.id ? 'bg-[#00f0ff]/5 border-l-2 border-[#00f0ff]' : ''
+                    }`}
                 >
                   <div className="flex items-center gap-3 overflow-hidden pr-2 text-left">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={selectedVaultDocs.includes(doc.id)}
                       onChange={(e) => {
@@ -923,18 +934,17 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       }}
                       className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
                     />
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[8px] shrink-0 ${
-                      (doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF') 
-                        ? 'bg-rose-500/10 text-rose-400' 
-                        : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[8px] shrink-0 ${(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF')
+                      ? 'bg-rose-500/10 text-rose-400'
+                      : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
                         ? 'bg-blue-500/10 text-blue-400'
                         : 'bg-cyan-500/10 text-cyan-400'
-                    }`}>
-                      {(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF') 
-                        ? 'PDF' 
+                      }`}>
+                      {(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF')
+                        ? 'PDF'
                         : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
-                        ? 'DOCX'
-                        : doc.fileType.substring(0, 4).toUpperCase()}
+                          ? 'DOCX'
+                          : doc.fileType.substring(0, 4).toUpperCase()}
                     </div>
                     <div className="overflow-hidden">
                       <div className="text-xs font-semibold text-white truncate">{doc.name}</div>
@@ -954,9 +964,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                     ) : (
                       <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">VALIDATED</span>
                     )}
-                    
+
                     <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      <a 
+                      <a
                         href={`/accounting/api/crm/document/download?docId=${doc.id}&preview=true`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -965,7 +975,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       >
                         👁️
                       </a>
-                      <button 
+                      <button
                         onClick={() => triggerFileDownloadWithSavePicker(doc.id, doc.name)}
                         className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-[#00f0ff]/5 hover:bg-[#00f0ff]/15 px-2 py-1 rounded transition-all font-semibold"
                         title="Download file"
@@ -973,7 +983,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                         📥
                       </button>
                     </div>
-                    
+
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1007,9 +1017,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   Confidence: {Math.round(activeDoc.confidenceScore * 100)}%
                 </span>
               </div>
-              
+
               <h3 className="font-extrabold text-white text-base tracking-tight leading-snug">{activeDoc.name}</h3>
-              
+
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div className="bg-[#0a0a0c] p-3 rounded-xl border border-white/5">
                   <span className="text-[8px] text-slate-500 font-bold block uppercase">Extracted Category</span>
@@ -1115,7 +1125,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Manual OCR Corrections</span>
                   <span className="text-[9px] text-slate-400 font-medium">Verify or adjust extracted text below</span>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div>
                     <label className="text-[8px] text-slate-500 font-bold block mb-1">DOCUMENT CATEGORY</label>
@@ -1173,16 +1183,15 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                 RAG Document Query Engine
               </h3>
             </div>
-            
+
             {/* Messages Display */}
             <div className="flex-1 p-4 overflow-y-auto space-y-3 font-sans text-xs">
               {chatMessages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-3 rounded-2xl max-w-[85%] leading-relaxed ${
-                    msg.sender === 'user' 
-                      ? 'bg-gradient-to-tr from-[#00f0ff]/10 to-[#6366f1]/10 text-slate-200 border border-[#00f0ff]/20' 
-                      : 'bg-white/5 text-slate-300 border border-white/5'
-                  }`}>
+                  <div className={`p-3 rounded-2xl max-w-[85%] leading-relaxed ${msg.sender === 'user'
+                    ? 'bg-gradient-to-tr from-[#00f0ff]/10 to-[#6366f1]/10 text-slate-200 border border-[#00f0ff]/20'
+                    : 'bg-white/5 text-slate-300 border border-white/5'
+                    }`}>
                     {msg.text}
                   </div>
                 </div>

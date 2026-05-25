@@ -204,6 +204,20 @@ Extract the values for the following boxes of Form 1099-DIV:
 - Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer).
 `;
       jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "totalOrdinaryDividends", "qualifiedDividends", "totalCapitalGainDist", "fedIncomeTax"`;
+    } else if (lowerFormType.includes('1099-r')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1099-R:
+- Payer's TIN/Employer Identification Number (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Recipient's TIN/SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 1: Gross Distribution (grossDistribution) -> Numeric value (float or integer).
+- Box 2a: Taxable Amount (taxableAmount) -> Numeric value (float or integer).
+- Box 4: Federal Income Tax Withheld (fedIncomeTax) -> Numeric value (float or integer).
+- Box 7: Distribution Code (distributionCode) -> Format as string (e.g. "7", "1", "7D", etc.).
+- Box 8: Other Income (otherIncome) -> Numeric value (float or integer).
+- Box 14: State Tax Withheld (stateIncomeTax) -> Numeric value (float or integer).
+- Box 16: State Distribution (stateDistribution) -> Numeric value (float or integer).
+`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "grossDistribution", "taxableAmount", "fedIncomeTax", "distributionCode", "otherIncome", "stateIncomeTax", "stateDistribution"`;
     } else if (lowerFormType.includes('1099-ssa') || lowerFormType.includes('ssa-1099')) {
       promptInstructions = `
 Extract the values for the following boxes of Form SSA-1099 (Social Security Benefit Statement):
