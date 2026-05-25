@@ -113,41 +113,98 @@ export async function POST(req: Request) {
         const isLikelyScannedPdf = isPdf && cleanText.length < 50;
 
         if (isLikelyScannedPdf && process.env.OPENAI_API_KEY) {
-          console.log('[Document Route] Scanned PDF detected — falling back to Vision OCR...');
+          console.log('[Document Route] Scanned PDF detected — using gpt-4o Vision OCR...');
           try {
-            // Send the raw PDF base64 to GPT-4o Vision for full OCR
+            // Strategy: upload the PDF to OpenAI Files API, then ask gpt-4o to read it
+            const { toFile } = await import('openai');
+            const pdfBlob = new Blob([fileBuffer], { type: 'application/pdf' });
+            const uploadedFile = await openai.files.create({
+              file: await toFile(pdfBlob, (name || 'document.pdf'), { type: 'application/pdf' }),
+              purpose: 'assistants'
+            });
+            console.log('[Document Route] PDF uploaded to OpenAI Files API:', uploadedFile.id);
+
             const visionResponse = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
+              model: 'gpt-4o',
               messages: [
                 {
                   role: 'user',
                   content: [
                     {
                       type: 'text',
-                      text: 'This is a scanned tax document. Transcribe ALL visible text precisely — including box numbers, labels, monetary values, TINs, SSNs, EINs, employer names, addresses, and any form type identifiers (e.g. W-2, 1099-NEC, 1099-MISC). Preserve layout context where possible so that box numbers and their values are clearly associated.'
+                      text: `You are an expert tax document OCR system.
+Carefully transcribe ALL visible text from this scanned tax document.
+
+CRITICAL RULES:
+1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC")
+2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
+   Example: "Box 1 Nonemployee compensation: 1600.00"
+3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN
+4. Do NOT summarize. Transcribe the actual text exactly as printed.
+5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.`
                     },
                     {
                       type: 'image_url',
                       image_url: {
-                        url: `data:application/pdf;base64,${fileData}`
+                        url: `data:image/jpeg;base64,${fileData}`,
+                        detail: 'high'
                       }
                     }
                   ]
                 }
-              ]
+              ],
+              max_tokens: 2000
             });
+
+            // Cleanup uploaded file
+            await openai.files.delete(uploadedFile.id).catch(() => {});
+
             const visionText = visionResponse.choices[0].message?.content || '';
             if (visionText && visionText.trim().length > 50) {
               rawText = visionText;
               extractedText = visionText;
-              console.log('[Document Route] Vision OCR succeeded. Extracted text length:', visionText.length);
+              console.log('[Document Route] gpt-4o OCR succeeded. Text length:', visionText.length);
             } else {
-              console.warn('[Document Route] Vision OCR returned minimal text. PDF may be unreadable.');
-              validationErrors = 'Scanned document could not be parsed. Try uploading as PNG/JPG image.';
+              console.warn('[Document Route] gpt-4o OCR returned minimal text.');
+              validationErrors = 'Scanned document could not be fully parsed. Manual review recommended.';
             }
-          } catch (visionFallbackErr) {
-            console.error('[Document Route] Vision OCR fallback failed:', visionFallbackErr);
-            validationErrors = 'Scanned document detected. Standard text layer is empty. Upload as PNG/JPG for full OCR.';
+          } catch (visionFallbackErr: any) {
+            console.error('[Document Route] gpt-4o OCR fallback failed:', visionFallbackErr?.message);
+            // Last resort: try sending as JPEG base64 directly to Vision
+            try {
+              console.log('[Document Route] Trying direct base64 JPEG fallback...');
+              const visionResponse2 = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'Transcribe ALL text from this tax form image precisely. Include form type, box numbers, labels, all dollar values, TINs/SSNs/EINs, and names.'
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: `data:image/jpeg;base64,${fileData}`,
+                          detail: 'high'
+                        }
+                      }
+                    ]
+                  }
+                ],
+                max_tokens: 2000
+              });
+              const fallbackText = visionResponse2.choices[0].message?.content || '';
+              if (fallbackText && fallbackText.trim().length > 50) {
+                rawText = fallbackText;
+                extractedText = fallbackText;
+                console.log('[Document Route] JPEG fallback OCR succeeded. Text length:', fallbackText.length);
+              }
+            } catch (lastErr: any) {
+              console.error('[Document Route] All OCR strategies failed:', lastErr?.message);
+              validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
+            }
           }
         }
 

@@ -313,37 +313,48 @@ export async function POST(req: Request) {
           // If PDF text layer is nearly empty, it's a scanned PDF — fall back to Vision OCR
           const cleanPdfText = extractedText.replace(/[\s\-\d]/g, '');
           if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY) {
-            console.log('[Email Route] Scanned PDF detected — falling back to Vision OCR...');
+            console.log('[Email Route] Scanned PDF detected — using gpt-4o Vision OCR...');
             try {
               const visionResponse = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: 'gpt-4o',
                 messages: [
                   {
                     role: 'user',
                     content: [
                       {
                         type: 'text',
-                        text: 'This is a scanned tax document. Transcribe ALL visible text precisely — including box numbers, labels, monetary values, TINs, SSNs, EINs, employer names, addresses, and any form type identifiers (e.g. W-2, 1099-NEC, 1099-MISC). Preserve layout context where possible so that box numbers and their values are clearly associated.'
+                        text: `You are an expert tax document OCR system.
+Carefully transcribe ALL visible text from this scanned tax document.
+
+CRITICAL RULES:
+1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC")
+2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
+   Example: "Box 1 Nonemployee compensation: 1600.00"
+3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN
+4. Do NOT summarize. Transcribe the actual text exactly as printed.
+5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.`
                       },
                       {
                         type: 'image_url',
                         image_url: {
-                          url: `data:application/pdf;base64,${finalBase64}`
+                          url: `data:image/jpeg;base64,${finalBase64}`,
+                          detail: 'high'
                         }
                       }
                     ]
                   }
-                ]
+                ],
+                max_tokens: 2000
               });
               const visionText = visionResponse.choices[0].message?.content || '';
               if (visionText && visionText.trim().length > 50) {
                 extractedText = visionText;
-                console.log('[Email Route] Vision OCR succeeded. Extracted text length:', visionText.length);
+                console.log('[Email Route] gpt-4o OCR succeeded. Extracted text length:', visionText.length);
               } else {
-                console.warn('[Email Route] Vision OCR returned minimal text for scanned PDF.');
+                console.warn('[Email Route] gpt-4o OCR returned minimal text for scanned PDF.');
               }
-            } catch (visionFallbackErr) {
-              console.error('[Email Route] Vision OCR fallback failed:', visionFallbackErr);
+            } catch (visionFallbackErr: any) {
+              console.error('[Email Route] gpt-4o OCR fallback failed:', visionFallbackErr?.message);
             }
           }
         } else if (isImage && process.env.OPENAI_API_KEY) {
