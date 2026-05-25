@@ -228,12 +228,17 @@ Extract the values for the following boxes of Form 1095-A (Health Insurance Mark
 - Box 8: Recipient's spouse's SSN/TIN (spouseSsn) -> Format as string (e.g. "XXX-XX-XXXX").
 - Box 10: Policy start date (policyStartDate) -> String (e.g. "MM/DD/YYYY").
 - Box 11: Policy termination date (policyTerminationDate) -> String (e.g. "MM/DD/YYYY").
-- Box 33A: Monthly enrollment premiums (annualEnrollmentPremiums) -> Numeric value (float or integer). Look for Box 33 Column A or Annual Totals.
-- Box 33B: Monthly second lowest cost silver plan (SLCSP) premium (annualSlcspPremium) -> Numeric value (float or integer). Look for Box 33 Column B or Annual Totals.
-- Box 33C: Monthly advance payment of premium tax credit (annualAdvancePtc) -> Numeric value (float or integer). Look for Box 33 Column C or Annual Totals.
+- Box 33A: Monthly enrollment premiums (annualEnrollmentPremiums) -> Numeric value (float or integer). Look for Row 33 Column A (Annual Totals Column A). Typically this matches the annual total (e.g., 12230.40).
+- Box 33B: Monthly second lowest cost silver plan (SLCSP) premium (annualSlcspPremium) -> Numeric value (float or integer). Look for Row 33 Column B (Annual Totals Column B). Typically this matches the annual total (e.g., 12610.80).
+- Box 33C: Monthly advance payment of premium tax credit (annualAdvancePtc) -> Numeric value (float or integer). Look for Row 33 Column C (Annual Totals Column C). Typically this matches the annual total (e.g., 11472.00).
 
 **Layout & Correlation Rules**:
 - Recipient's SSN is in Box 5 (above the spouse section). Spouse's SSN is in Box 8. Do not swap them.
+- In Part III (Coverage Information), Row 33 lists the "Annual Totals" for Column A, Column B, and Column C.
+- Column A (Enrollment Premiums) is on the left of the table.
+- Column B (Second Lowest Cost Silver Plan / SLCSP) is in the middle of the table.
+- Column C (Advance Payment of Premium Tax Credit / APTC) is on the right of the table.
+- You MUST map the left value (e.g., 12230.40) to "annualEnrollmentPremiums", the middle value (e.g., 12610.80) to "annualSlcspPremium", and the right value (e.g., 11472.00) to "annualAdvancePtc". Do NOT swap or shift them.
 `;
       jsonSchemaKeysDescription = `"marketplaceIdentifier", "policyNumber", "recipientName", "recipientSsn", "spouseSsn", "policyStartDate", "policyTerminationDate", "annualEnrollmentPremiums", "annualSlcspPremium", "annualAdvancePtc"`;
     } else if (lowerFormType.includes('1099-ssa') || lowerFormType.includes('ssa-1099')) {
