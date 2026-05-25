@@ -218,6 +218,24 @@ Extract the values for the following boxes of Form 1099-R:
 - Box 16: State Distribution (stateDistribution) -> Numeric value (float or integer).
 `;
       jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "grossDistribution", "taxableAmount", "fedIncomeTax", "distributionCode", "otherIncome", "stateIncomeTax", "stateDistribution"`;
+    } else if (lowerFormType.includes('1095-a') || lowerFormType.includes('1095a')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1095-A (Health Insurance Marketplace Statement):
+- Box 1: Marketplace identifier (marketplaceIdentifier) -> String.
+- Box 2: Marketplace-assigned policy number (policyNumber) -> String.
+- Box 4: Recipient's name (recipientName) -> String.
+- Box 5: Recipient's SSN/TIN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 8: Recipient's spouse's SSN/TIN (spouseSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 10: Policy start date (policyStartDate) -> String (e.g. "MM/DD/YYYY").
+- Box 11: Policy termination date (policyTerminationDate) -> String (e.g. "MM/DD/YYYY").
+- Box 33A: Monthly enrollment premiums (annualEnrollmentPremiums) -> Numeric value (float or integer). Look for Box 33 Column A or Annual Totals.
+- Box 33B: Monthly second lowest cost silver plan (SLCSP) premium (annualSlcspPremium) -> Numeric value (float or integer). Look for Box 33 Column B or Annual Totals.
+- Box 33C: Monthly advance payment of premium tax credit (annualAdvancePtc) -> Numeric value (float or integer). Look for Box 33 Column C or Annual Totals.
+
+**Layout & Correlation Rules**:
+- Recipient's SSN is in Box 5 (above the spouse section). Spouse's SSN is in Box 8. Do not swap them.
+`;
+      jsonSchemaKeysDescription = `"marketplaceIdentifier", "policyNumber", "recipientName", "recipientSsn", "spouseSsn", "policyStartDate", "policyTerminationDate", "annualEnrollmentPremiums", "annualSlcspPremium", "annualAdvancePtc"`;
     } else if (lowerFormType.includes('1099-ssa') || lowerFormType.includes('ssa-1099')) {
       promptInstructions = `
 Extract the values for the following boxes of Form SSA-1099 (Social Security Benefit Statement):

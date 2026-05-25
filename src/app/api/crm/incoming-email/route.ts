@@ -31,7 +31,7 @@ Filename: "${filename}"
 Email Subject: "${subject}"
 Email Body: "${bodyText}"
 
-Classify it into one of these exact categories: "W2", "1099-NEC", "1099", "1099-INT", "1099-DIV", "1099-R", "1099-MISC", "1099-B", "SSA-1099", "Bank_Statement", "Receipt", "Tax_Notice", "Ledger", "Balance_Sheet", "UNCLASSIFIED".
+Classify it into one of these exact categories: "W2", "1099-NEC", "1099", "1099-INT", "1099-DIV", "1099-R", "1099-MISC", "1099-B", "SSA-1099", "1095-A", "Bank_Statement", "Receipt", "Tax_Notice", "Ledger", "Balance_Sheet", "UNCLASSIFIED".
 
 Also, generate a 1-sentence summary of the document based on its name/context.
 Provide a confidence score between 0.0 and 1.0.
@@ -98,6 +98,10 @@ function fallbackClassifier(filename: string) {
     category = '1099';
     aiSummary = '1099 Information Return.';
     confidenceScore = 0.85;
+  } else if (nameLower.includes('1095-a') || nameLower.includes('1095a')) {
+    category = '1095-A';
+    aiSummary = '1095-A Health Insurance Marketplace Statement.';
+    confidenceScore = 0.9;
   } else if (nameLower.includes('ssa-1099') || nameLower.includes('ssa1099') || nameLower.includes('social security')) {
     category = 'SSA-1099';
     aiSummary = 'SSA-1099 Social Security Benefit Statement.';
@@ -383,8 +387,8 @@ export async function POST(req: Request) {
           console.error("Failed to generate document chunks for email attachment:", chunkErr);
         }
 
-        // If the document is W2 or 1099, run the unified tax form field extractor
-        if (doc.category === 'W2' || doc.category.startsWith('1099') || doc.category.includes('1099')) {
+        // If the document is W2, 1099, or 1095-A, run the unified tax form field extractor
+        if (doc.category === 'W2' || doc.category.startsWith('1099') || doc.category.includes('1099') || doc.category === '1095-A') {
           try {
             await extractAndSaveTaxFormData(doc.id, doc.category, extractedText);
           } catch (tfErr) {

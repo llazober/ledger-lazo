@@ -100,8 +100,19 @@ const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?:
     { label: "Box 7: Distribution Code", key: "distributionCode", isMono: true },
     { label: "Box 8: Other Income", key: "otherIncome", isMonetary: true },
     { label: "Box 14: State Tax Withheld", key: "stateIncomeTax", isMonetary: true },
-    { label: "Box 16: State Distribution", key: "stateDistribution", isMonetary: true },
-
+    { label: "Box 16: State Distribution", key: "stateDistribution", isMonetary: true }
+  ],
+  "1095-a": [
+    { label: "Box 1: Marketplace Identifier", key: "marketplaceIdentifier", isMono: true },
+    { label: "Box 2: Policy Number", key: "policyNumber", isMono: true },
+    { label: "Box 4: Recipient Name", key: "recipientName" },
+    { label: "Box 5: Recipient SSN", key: "recipientSsn", isMono: true },
+    { label: "Box 8: Spouse SSN", key: "spouseSsn", isMono: true },
+    { label: "Box 10: Policy Start Date", key: "policyStartDate", isMono: true },
+    { label: "Box 11: Policy End Date", key: "policyTerminationDate", isMono: true },
+    { label: "Box 33A: Annual Enrollment Premiums", key: "annualEnrollmentPremiums", isMonetary: true },
+    { label: "Box 33B: Annual SLCSP Premium", key: "annualSlcspPremium", isMonetary: true },
+    { label: "Box 33C: Annual Advance PTC", key: "annualAdvancePtc", isMonetary: true }
   ]
 
 };
@@ -1145,6 +1156,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       <option value="1099-B">1099-B - Broker Transactions</option>
                       <option value="1099-G">1099-G - Government Payments</option>
                       <option value="1099-UNCLASSIFIED">1099-UNCLASSIFIED - Other 1099 Forms</option>
+                      <option value="1095-A">1095-A - Health Insurance Marketplace Statement</option>
                       <option value="Bank_Statement">Bank Statement</option>
                       <option value="Receipt">Receipt</option>
                       <option value="Tax_Notice">Tax Notice</option>
