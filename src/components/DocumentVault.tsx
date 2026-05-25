@@ -91,7 +91,7 @@ const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?:
     { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
     { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true }
   ],
-  "1099-R": [
+  "1099-r": [
     { label: "Payer's federal identification number", key: "payerEin", isMono: true },
     { label: "Recipient's identification number", key: "recipientSsn", isMono: true },
     { label: "Box 1: Gross Distribution", key: "grossDistribution", isMonetary: true },
