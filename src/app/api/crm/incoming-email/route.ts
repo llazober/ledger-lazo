@@ -4,6 +4,8 @@ import { openai } from '@/lib/openai';
 import { auditClientDocuments } from '@/lib/taxRules';
 import { PDFDocument } from 'pdf-lib';
 import { processDocumentChunks, extractAndSaveTaxFormData } from '@/lib/ai-processor';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Dynamic document classifier using OpenAI GPT-4o-mini (falls back to regex rules)
 async function classifyDocumentWithAI(
@@ -224,6 +226,41 @@ export async function POST(req: Request) {
       inlineAttachmentsType: typeof body.inlineAttachments,
       inlineAttachmentsLength: Array.isArray(body.inlineAttachments) ? body.inlineAttachments.length : null,
     });
+
+    try {
+      const logPath = path.join(process.cwd(), 'scratch', 'incoming-email-raw.log');
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        fromEmail,
+        fromName,
+        subject,
+        bodyKeys: Object.keys(body),
+        attachments: attachments ? (Array.isArray(attachments) ? attachments.map((a: any) => ({
+          name: a.name || a.filename || a.fileName,
+          fileType: a.fileType || a.mimeType || a.contentType,
+          size: a.fileSize || a.size,
+          hasData: !!(a.data || a.base64Data || a.fileData || a.content),
+          dataLength: (a.data || a.base64Data || a.fileData || a.content)?.length
+        })) : typeof attachments) : null,
+        bodyAttachments: body.attachments ? (Array.isArray(body.attachments) ? body.attachments.map((a: any) => ({
+          name: a.name || a.filename || a.fileName,
+          fileType: a.fileType || a.mimeType || a.contentType,
+          size: a.fileSize || a.size,
+          hasData: !!(a.data || a.base64Data || a.fileData || a.content),
+          dataLength: (a.data || a.base64Data || a.fileData || a.content)?.length
+        })) : typeof body.attachments) : null,
+        inlineAttachments: body.inlineAttachments ? (Array.isArray(body.inlineAttachments) ? body.inlineAttachments.map((a: any) => ({
+          name: a.name || a.filename || a.fileName,
+          fileType: a.fileType || a.mimeType || a.contentType,
+          size: a.fileSize || a.size,
+          hasData: !!(a.data || a.base64Data || a.fileData || a.content),
+          dataLength: (a.data || a.base64Data || a.fileData || a.content)?.length
+        })) : typeof body.inlineAttachments) : null,
+      };
+      fs.appendFileSync(logPath, JSON.stringify(logEntry, null, 2) + '\n\n');
+    } catch (logErr) {
+      console.error("Failed to write to local debug log file:", logErr);
+    }
     
     // Support standard attachments, inline attachments, and potential arrays sent by n8n or mail parsers
     const rawAttachments = [
