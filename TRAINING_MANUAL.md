@@ -28,10 +28,19 @@ The Document Vault manages taxpayer source files, audits, downloads, and merges.
 
 ### 📁 Ingestion Formats & Vision OCR
 The vault supports both digital PDFs and raw images (`PNG`, `JPG`, `JPEG`, `WEBP`).
-*   **Direct Vision OCR Transcription**: 
-    *   To prevent text extraction failures common in scanned documents, raw images are processed directly by the **OpenAI GPT-4o-mini Vision API**.
-    *   This extracts precise field data (employer info, wages, dates, amounts) from the visual layout of the image.
-    *   Un-supported files (e.g., `.xlsx`) are blocked with a warning alert.
+*   **Two-Pass OCR Pipeline**:
+    1.  **Text Layer (PDF)**: For digitally-generated PDFs, the system first attempts to extract the text layer directly (fast, no API cost).
+    2.  **Vision OCR Fallback (Scanned/Image-Only)**: If the text layer is blank or too short (< 50 characters), the system automatically escalates to the **OpenAI `gpt-4o` Vision API** using `detail: high` to perform a high-precision visual read of the document. This ensures near-100% success on scanned PDFs — the most common format for W-2 and 1099 forms sent by employers.
+    3.  **Native Image OCR**: Raw images (`PNG`, `JPG`, `JPEG`, `WEBP`) bypass PDF extraction entirely and go directly to the `gpt-4o` Vision API for direct visual transcription.
+*   Un-supported files (e.g., `.xlsx`) are blocked with a warning alert.
+*   Images are stored in their **native format** (not converted to PDF) to preserve maximum visual fidelity for Vision API accuracy.
+
+### 🧾 Unified Tax Form Data Extraction
+After any document is ingested and classified as a tax form, the system automatically extracts structured box-level data and stores it in the `TaxFormData` database table:
+*   **Supported Forms**: `W-2`, `1099-NEC`, `1099-MISC`, `1099-INT`, `1099-DIV`, `1099-SSA` (more forms can be added without database migrations).
+*   **Duplicate Copy Handling**: When a single W-2 or 1099 page contains multiple identical copies (e.g., Copy B, Copy C, Copy 2), the AI extracts exactly **one unified set of values** and discards the duplicates.
+*   **Dynamic JSON Schema**: All box values are stored as a flexible `boxes` JSON column (e.g., `{ "1": 75000.00, "a": "999-88-7777" }`), allowing future forms like **1095**, **1098**, or **Schedule K-1** to be added with zero schema migrations.
+*   **Extracted Data Inspector Panel**: When a tax form document is selected in the Document Vault, the right-side inspector panel displays a dedicated **"Extracted Tax Form Data"** card with clearly labeled box values — automatically adapted per form type (e.g., Box 1 is labeled "Wages" for W-2 and "Nonemployee Compensation" for 1099-NEC).
 
 ### ⚡ Batch Actions
 Select multiple documents using the checkbox triggers to perform batch operations:
@@ -136,4 +145,4 @@ Follow these steps to import the configured workflow files into your n8n workspa
 6. **Activate**: Click the **"Active"** toggle in the top-right corner to go live.
 
 ---
-*Generated for CPA Ledger App | v3.6 — Fulfillment Automation*
+*Generated for CPA Ledger App | v3.7 — Unified Tax Form Intelligence*
