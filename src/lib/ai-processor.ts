@@ -117,6 +117,14 @@ export async function extractAndSaveTaxFormData(documentId: string, formType: st
       return { success: false, error: 'API key missing' };
     }
 
+    // Fetch document details to check for image data
+    const doc = await prisma.document.findUnique({
+      where: { id: documentId }
+    });
+
+    const isImage = doc && doc.fileData && 
+                    ['png', 'jpg', 'jpeg', 'webp'].includes(doc.fileType?.toLowerCase() || '');
+
     // Determine the specific prompts and JSON schemas depending on the form type
     let promptInstructions = '';
     let jsonSchemaKeysDescription = '';
@@ -195,9 +203,9 @@ Extract the values for the following boxes of Form SSA-1099 (Social Security Ben
     }
 
     const prompt = `You are an expert CPA Tax Assistant. 
-Extract key tax data for Form Type: "${formType}" from the OCR text below. 
+Extract key tax data for Form Type: "${formType}" from this document. 
 
-Text content:
+OCR Text Content (if available):
 ---
 ${text}
 ---
@@ -211,9 +219,38 @@ Ensure all monetary amounts are represented as clean numbers (do not include cur
 Format your output as a JSON object with these exact keys:
 ${jsonSchemaKeysDescription}`;
 
+    let messages: any[] = [];
+    if (isImage && doc?.fileData) {
+      console.log(`[TaxForm Extractor] Document ${documentId} is an image. Using Vision API to increase extraction accuracy (especially for Box 2 and layout grids).`);
+      const fileExt = doc.fileType.toLowerCase();
+      const mimeType = fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : `image/${fileExt}`;
+      messages = [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${doc.fileData}`
+              }
+            }
+          ]
+        }
+      ];
+    } else {
+      console.log(`[TaxForm Extractor] Utilizing standard Text API...`);
+      messages = [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ];
+    }
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       response_format: { type: "json_object" }
     });
 
