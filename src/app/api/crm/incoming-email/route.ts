@@ -313,63 +313,19 @@ export async function POST(req: Request) {
           // If PDF text layer is nearly empty, it's a scanned PDF — fall back to Vision OCR
           const cleanPdfText = extractedText.replace(/[\s\-\d]/g, '');
           if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY) {
-            console.log('[Email Route] Scanned PDF detected — converting to images for Vision OCR...');
+            console.log('[Email Route] Scanned PDF detected — using OpenAI Files API for high-fidelity OCR...');
             try {
-              const { convertPdfToImages } = await import('@/lib/pdf-converter');
-              const imagesBase64 = await convertPdfToImages(fileBuffer);
+              const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
+              const visionText = await performVisionOcrWithFilesApi(fileBuffer, name || 'email_attachment.pdf');
               
-              if (imagesBase64.length > 0) {
-                console.log(`[Email Route] Converted scanned PDF to ${imagesBase64.length} pages. Sending to gpt-4o Vision...`);
-                
-                const contentBlocks: any[] = [
-                  {
-                    type: 'text',
-                    text: `You are an expert tax document OCR system.
-Carefully transcribe ALL visible text from these scanned tax document pages.
-
-CRITICAL RULES:
-1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC")
-2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
-   Example: "Box 1 Nonemployee compensation: 1600.00"
-3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN
-4. Do NOT summarize. Transcribe the actual text exactly as printed.
-5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.`
-                  }
-                ];
-
-                for (const imgBase64 of imagesBase64) {
-                  contentBlocks.push({
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:image/png;base64,${imgBase64}`,
-                      detail: 'high'
-                    }
-                  });
-                }
-
-                const visionResponse = await openai.chat.completions.create({
-                  model: 'gpt-4o',
-                  messages: [
-                    {
-                      role: 'user',
-                      content: contentBlocks
-                    }
-                  ],
-                  max_tokens: 2000
-                });
-
-                const visionText = visionResponse.choices[0].message?.content || '';
-                if (visionText && visionText.trim().length > 50) {
-                  extractedText = visionText;
-                  console.log('[Email Route] gpt-4o PDF page Vision OCR succeeded. Text length:', visionText.length);
-                } else {
-                  console.warn('[Email Route] gpt-4o PDF page Vision OCR returned minimal text.');
-                }
+              if (visionText && visionText.trim().length > 50) {
+                extractedText = visionText;
+                console.log('[Email Route] OpenAI Files API vision OCR succeeded. Text length:', visionText.length);
               } else {
-                console.warn('[Email Route] No pages could be converted from the PDF.');
+                console.warn('[Email Route] OpenAI Files API vision OCR returned minimal text.');
               }
             } catch (visionFallbackErr: any) {
-              console.error('[Email Route] PDF to image Vision OCR failed:', visionFallbackErr?.message);
+              console.error('[Email Route] OpenAI Files API vision OCR failed:', visionFallbackErr?.message);
             }
           }
         } else if (isImage && process.env.OPENAI_API_KEY) {

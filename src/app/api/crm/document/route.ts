@@ -114,68 +114,23 @@ export async function POST(req: Request) {
 
         let visionOcrSucceeded = false;
         if (isLikelyScannedPdf && process.env.OPENAI_API_KEY) {
-          console.log('[Document Route] Scanned PDF detected — converting to images for Vision OCR...');
+          console.log('[Document Route] Scanned PDF detected — using OpenAI Files API for high-fidelity OCR...');
           try {
-            const { convertPdfToImages } = await import('@/lib/pdf-converter');
-            const imagesBase64 = await convertPdfToImages(fileBuffer);
+            const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
+            const visionText = await performVisionOcrWithFilesApi(fileBuffer, name || 'document.pdf');
             
-            if (imagesBase64.length > 0) {
-              console.log(`[Document Route] Converted scanned PDF to ${imagesBase64.length} pages. Sending to gpt-4o Vision...`);
-              
-              const contentBlocks: any[] = [
-                {
-                  type: 'text',
-                  text: `You are an expert tax document OCR system.
-Carefully transcribe ALL visible text from these scanned tax document pages.
-
-CRITICAL RULES:
-1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC")
-2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
-   Example: "Box 1 Nonemployee compensation: 1600.00"
-3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN
-4. Do NOT summarize. Transcribe the actual text exactly as printed.
-5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.`
-                }
-              ];
-
-              for (const imgBase64 of imagesBase64) {
-                contentBlocks.push({
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:image/png;base64,${imgBase64}`,
-                    detail: 'high'
-                  }
-                });
-              }
-
-              const visionResponse = await openai.chat.completions.create({
-                model: 'gpt-4o',
-                messages: [
-                  {
-                    role: 'user',
-                    content: contentBlocks
-                  }
-                ],
-                max_tokens: 2000
-              });
-
-              const visionText = visionResponse.choices[0].message?.content || '';
-              if (visionText && visionText.trim().length > 50) {
-                rawText = visionText;
-                extractedText = visionText;
-                visionOcrSucceeded = true;
-                console.log('[Document Route] gpt-4o PDF page Vision OCR succeeded. Text length:', visionText.length);
-              } else {
-                console.warn('[Document Route] gpt-4o PDF page Vision OCR returned minimal text.');
-                validationErrors = 'Scanned PDF could not be fully parsed. Check image quality.';
-              }
+            if (visionText && visionText.trim().length > 50) {
+              rawText = visionText;
+              extractedText = visionText;
+              visionOcrSucceeded = true;
+              console.log('[Document Route] OpenAI Files API vision OCR succeeded. Text length:', visionText.length);
             } else {
-              console.warn('[Document Route] No pages could be converted from the PDF.');
-              validationErrors = 'Could not convert scanned PDF pages to images for parsing.';
+              console.warn('[Document Route] OpenAI Files API vision OCR returned minimal text.');
+              validationErrors = 'Scanned PDF could not be fully parsed. Check image quality.';
             }
           } catch (visionFallbackErr: any) {
-            console.error('[Document Route] PDF to image Vision OCR failed:', visionFallbackErr?.message);
-            validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
+            console.error('[Document Route] OpenAI Files API vision OCR failed:', visionFallbackErr?.message);
+            validationErrors = 'Scanned document could not be parsed. Please try again or check the file quality.';
           }
         }
 
@@ -306,43 +261,17 @@ export async function PATCH(req: Request) {
 
       if (isPdf && fileBuffer) {
         try {
-          const { convertPdfToImages } = await import('@/lib/pdf-converter');
-          const imagesBase64 = await convertPdfToImages(fileBuffer);
+          console.log(`[Reprocess] Running OpenAI Files API OCR for PDF document ${docId}...`);
+          const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
+          const visionText = await performVisionOcrWithFilesApi(fileBuffer, existingDoc.name);
           
-          if (imagesBase64 && imagesBase64.length > 0) {
-            console.log(`[Reprocess] Successfully converted scanned PDF into ${imagesBase64.length} images. Running GPT-4o Vision OCR...`);
-            
-            const messagesContent: any[] = [
-              {
-                type: 'text',
-                text: 'Transcribe ALL visible text from the following document image pages. Perform high-fidelity OCR, preserving all headers, forms, labels, tables, key-value pairs, numbers, boxes, and SSNs/EINs exactly as printed. Do not summarize or omit anything.'
-              }
-            ];
-            
-            for (const imgBase64 of imagesBase64) {
-              messagesContent.push({
-                type: 'image_url',
-                image_url: {
-                  url: `data:image/png;base64,${imgBase64}`
-                }
-              });
-            }
-
-            const visionResponse = await openai.chat.completions.create({
-              model: 'gpt-4o',
-              messages: [{ role: 'user', content: messagesContent }],
-              max_tokens: 4000
-            });
-
-            const visionText = visionResponse.choices[0].message?.content || '';
-            if (visionText && visionText.trim().length > 10) {
-              rawText = visionText;
-              visionOcrSucceeded = true;
-              console.log(`[Reprocess] GPT-4o Vision OCR succeeded! Total transcribed chars: ${visionText.length}`);
-            }
+          if (visionText && visionText.trim().length > 10) {
+            rawText = visionText;
+            visionOcrSucceeded = true;
+            console.log(`[Reprocess] OpenAI Files API vision OCR succeeded! Total transcribed chars: ${visionText.length}`);
           }
         } catch (pdfErr: any) {
-          console.error('[Reprocess] PDF to image Vision OCR failed:', pdfErr);
+          console.error('[Reprocess] OpenAI Files API vision OCR failed:', pdfErr);
         }
       } else if (isImage && existingDoc.fileData) {
         try {
