@@ -114,19 +114,19 @@ export async function POST(req: Request) {
 
         let visionOcrSucceeded = false;
         if (isLikelyScannedPdf && process.env.OPENAI_API_KEY) {
-          console.log('[Document Route] Scanned PDF detected — using gpt-4o Vision OCR with application/pdf...');
+          console.log('[Document Route] Scanned PDF detected — converting to images for Vision OCR...');
           try {
-            // Send PDF directly as application/pdf base64 — GPT-4o supports this natively
-            const visionResponse = await openai.chat.completions.create({
-              model: 'gpt-4o',
-              messages: [
+            const { convertPdfToImages } = await import('@/lib/pdf-converter');
+            const imagesBase64 = await convertPdfToImages(fileBuffer);
+            
+            if (imagesBase64.length > 0) {
+              console.log(`[Document Route] Converted scanned PDF to ${imagesBase64.length} pages. Sending to gpt-4o Vision...`);
+              
+              const contentBlocks: any[] = [
                 {
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'text',
-                      text: `You are an expert tax document OCR system.
-Carefully transcribe ALL visible text from this scanned tax document.
+                  type: 'text',
+                  text: `You are an expert tax document OCR system.
+Carefully transcribe ALL visible text from these scanned tax document pages.
 
 CRITICAL RULES:
 1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC")
@@ -135,63 +135,46 @@ CRITICAL RULES:
 3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
 5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.`
-                    },
-                    {
-                      type: 'image_url',
-                      image_url: {
-                        url: `data:application/pdf;base64,${fileData}`,
-                        detail: 'high'
-                      }
-                    }
-                  ]
                 }
-              ],
-              max_tokens: 2000
-            });
+              ];
 
-            const visionText = visionResponse.choices[0].message?.content || '';
-            if (visionText && visionText.trim().length > 50) {
-              rawText = visionText;
-              extractedText = visionText;
-              visionOcrSucceeded = true;
-              console.log('[Document Route] gpt-4o PDF OCR succeeded. Text length:', visionText.length);
-            } else {
-              console.warn('[Document Route] gpt-4o PDF OCR returned minimal text. Trying JPEG fallback...');
-              // Last resort: try as JPEG in case this is a PDF that embeds a single image page
-              const visionResponse2 = await openai.chat.completions.create({
+              for (const imgBase64 of imagesBase64) {
+                contentBlocks.push({
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/png;base64,${imgBase64}`,
+                    detail: 'high'
+                  }
+                });
+              }
+
+              const visionResponse = await openai.chat.completions.create({
                 model: 'gpt-4o',
                 messages: [
                   {
                     role: 'user',
-                    content: [
-                      {
-                        type: 'text',
-                        text: 'Transcribe ALL text from this tax form precisely. Include form type, box numbers, labels, all dollar values, TINs/SSNs/EINs, and names.'
-                      },
-                      {
-                        type: 'image_url',
-                        image_url: {
-                          url: `data:application/pdf;base64,${fileData}`,
-                          detail: 'high'
-                        }
-                      }
-                    ]
+                    content: contentBlocks
                   }
                 ],
                 max_tokens: 2000
               });
-              const fallbackText = visionResponse2.choices[0].message?.content || '';
-              if (fallbackText && fallbackText.trim().length > 50) {
-                rawText = fallbackText;
-                extractedText = fallbackText;
+
+              const visionText = visionResponse.choices[0].message?.content || '';
+              if (visionText && visionText.trim().length > 50) {
+                rawText = visionText;
+                extractedText = visionText;
                 visionOcrSucceeded = true;
-                console.log('[Document Route] PDF fallback OCR succeeded. Text length:', fallbackText.length);
+                console.log('[Document Route] gpt-4o PDF page Vision OCR succeeded. Text length:', visionText.length);
               } else {
-                validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
+                console.warn('[Document Route] gpt-4o PDF page Vision OCR returned minimal text.');
+                validationErrors = 'Scanned PDF could not be fully parsed. Check image quality.';
               }
+            } else {
+              console.warn('[Document Route] No pages could be converted from the PDF.');
+              validationErrors = 'Could not convert scanned PDF pages to images for parsing.';
             }
           } catch (visionFallbackErr: any) {
-            console.error('[Document Route] gpt-4o Vision OCR failed:', visionFallbackErr?.message);
+            console.error('[Document Route] PDF to image Vision OCR failed:', visionFallbackErr?.message);
             validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
           }
         }
