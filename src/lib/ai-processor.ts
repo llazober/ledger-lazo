@@ -214,6 +214,15 @@ Extract the values for the following boxes of Form SSA-1099 (Social Security Ben
 - Recipient's SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
 `;
       jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "benefitsPaid", "fedIncomeTax", "netBenefits"`;
+    } else if (lowerFormType.includes('1099') || lowerFormType.includes('unclassified') || lowerFormType.includes('other')) {
+      promptInstructions = `
+This is a general or unclassified Form ${formType}.
+Extract all numbered or lettered boxes (e.g. Box 1, Box 2a, Box 3, Box 14, Box 16, etc.) present on the form.
+For your JSON output:
+- Standardize the keys by camelCasing the label (e.g. 'box1', 'box2a', 'box3', 'payerEin', 'recipientSsn', 'grossDistribution', 'federalIncomeTaxWithheld').
+- Only extract boxes that are clearly labeled on the form.
+`;
+      jsonSchemaKeysDescription = `any dynamic camelCase keys representing the form boxes found (e.g. "payerEin", "recipientSsn", "box1", "box2")`;
     } else {
       console.log(`[TaxForm Extractor] Form type "${formType}" is not supported for key boxes extraction. Skipping.`);
       return { success: true, message: 'Unrecognized tax form type for box extraction' };

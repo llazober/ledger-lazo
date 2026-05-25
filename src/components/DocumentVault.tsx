@@ -1057,6 +1057,11 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                       <option value="1099-INT">1099-INT - Interest Income</option>
                       <option value="1099-DIV">1099-DIV - Dividends & Distributions</option>
                       <option value="1099-MISC">1099-MISC - Miscellaneous Income</option>
+                      <option value="1099-R">1099-R - Pension & Retirement Distributions</option>
+                      <option value="1099-K">1099-K - Merchant Card & Network Transactions</option>
+                      <option value="1099-B">1099-B - Broker Transactions</option>
+                      <option value="1099-G">1099-G - Government Payments</option>
+                      <option value="1099-UNCLASSIFIED">1099-UNCLASSIFIED - Other 1099 Forms</option>
                       <option value="Bank_Statement">Bank Statement</option>
                       <option value="Receipt">Receipt</option>
                       <option value="Tax_Notice">Tax Notice</option>
