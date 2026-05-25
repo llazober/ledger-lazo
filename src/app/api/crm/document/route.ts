@@ -190,7 +190,7 @@ Format your output as a JSON object with keys:
         fileType,
         taxYear: 2026,
         category,
-        status: validationErrors ? 'REVIEW_REQUIRED' : status,
+        status: (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED',
         extractedText,
         aiSummary,
         confidenceScore,
@@ -345,8 +345,8 @@ Format your output as a JSON object with keys:
             activeCategory = result.category || activeCategory;
             activeSummary = result.aiSummary || activeSummary;
             confidenceScore = result.confidenceScore || confidenceScore;
-            validationErrors = result.validationErrors || null;
-            status = validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
+             validationErrors = result.validationErrors || null;
+             status = (validationErrors || activeCategory === 'UNCLASSIFIED' || activeCategory === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
           } catch (openaiErr) {
             console.error("[Reprocess] OpenAI processing of raw text failed:", openaiErr);
           }
@@ -370,10 +370,16 @@ Format your output as a JSON object with keys:
         }
       });
     } else {
+      let statusToUpdate = undefined;
+      if (category) {
+        statusToUpdate = (category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+      }
+
       document = await prisma.document.update({
         where: { id: docId },
         data: {
           ...(category && { category }),
+          ...(statusToUpdate && { status: statusToUpdate }),
           ...(extractedText !== undefined && { extractedText }),
           ...(aiSummary && { aiSummary }),
           ...(taxYear && { taxYear: parseInt(taxYear) })

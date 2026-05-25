@@ -262,7 +262,7 @@ export async function POST(req: Request) {
         convertedFileType = attachmentExtension.toUpperCase();
       }
 
-      const status = aiResult.validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
+      const status = (aiResult.validationErrors || aiResult.category === 'UNCLASSIFIED' || aiResult.category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
       const validationErrors = aiResult.validationErrors;
 
       let extractedText = '';
