@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
 import mammoth from 'mammoth';
-import { processDocumentChunks, extractAndSaveW2Data } from '@/lib/ai-processor';
+import { processDocumentChunks, extractAndSaveTaxFormData } from '@/lib/ai-processor';
 
 export async function POST(req: Request) {
   try {
@@ -188,12 +188,12 @@ Format your output as a JSON object with keys:
         console.error("Failed to generate document chunks on create:", chunkErr);
       }
 
-      // If document is W2, extract W2 fields
-      if (document.category === 'W2') {
+      // If document is W2 or 1099, extract tax form fields
+      if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099')) {
         try {
-          await extractAndSaveW2Data(document.id, extractedText);
-        } catch (w2Err) {
-          console.error("Failed to extract W2 data on create:", w2Err);
+          await extractAndSaveTaxFormData(document.id, document.category, extractedText);
+        } catch (tfErr) {
+          console.error("Failed to extract tax form data on create:", tfErr);
         }
       }
     }
@@ -233,14 +233,14 @@ export async function PATCH(req: Request) {
       }
     }
 
-    // Extract W-2 fields if category is W2 and we have text
-    if (document.category === 'W2') {
+    // Extract tax form fields if category is W2 or 1099 and we have text
+    if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099')) {
       const activeText = extractedText !== undefined ? extractedText : document.extractedText;
       if (activeText) {
         try {
-          await extractAndSaveW2Data(docId, activeText);
-        } catch (w2Err) {
-          console.error("Failed to extract W2 data after PATCH:", w2Err);
+          await extractAndSaveTaxFormData(docId, document.category, activeText);
+        } catch (tfErr) {
+          console.error("Failed to extract tax form data after PATCH:", tfErr);
         }
       }
     }

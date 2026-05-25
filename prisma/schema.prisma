@@ -78,7 +78,7 @@ model Document {
   fileData         String?         @db.Text // Base64 encoded file contents (for database storage)
   
   chunks           DocumentChunk[]
-  w2Data           W2Data?
+  taxFormData      TaxFormData?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -196,23 +196,15 @@ model TokenUsage {
   createdAt        DateTime @default(now())
 }
 
-// 10. Automated W-2 Extracted Fields for Data Entry Integration
-model W2Data {
-  id                  String   @id @default(cuid())
-  documentId          String   @unique
-  document            Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  
-  employeeSsn         String?  // Box a: Employee's social security number
-  employerEin         String?  // Box b: Employer identification number (EIN)
-  wages               Float?   // Box 1: Wages, tips, other compensation
-  fedIncomeTax        Float?   // Box 2: Federal income tax withheld
-  socialSecurityWages Float?   // Box 3: Social security wages
-  socialSecurityTax   Float?   // Box 4: Social security tax withheld
-  medicareWages       Float?   // Box 5: Medicare wages and tips
-  medicareTax         Float?   // Box 6: Medicare tax withheld
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+// 10. Automated Tax Form Extracted Fields for Data Entry Integration
+model TaxFormData {
+  id         String   @id @default(cuid())
+  documentId String   @unique
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  formType   String   // W2, 1099-NEC, 1099-MISC, 1099-INT, 1099-DIV, 1099-SSA, etc.
+  boxes      Json     // Dynamic key-value pairs representing form boxes: e.g. { "1": 125000.5, "a": "999-88-7777" }
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([documentId])
 }

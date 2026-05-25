@@ -95,15 +95,16 @@ export async function processDocumentChunks(documentId: string, text: string) {
 }
 
 /**
- * Extracts W-2 fields from document text using OpenAI and saves it in W2Data table.
+ * Extracts fields from dynamic tax forms (W-2, 1099s) from document text using OpenAI 
+ * and saves it in the TaxFormData table.
  * If the record already exists, it updates it; otherwise it creates it.
  */
-export async function extractAndSaveW2Data(documentId: string, text: string) {
+export async function extractAndSaveTaxFormData(documentId: string, formType: string, text: string) {
   try {
-    console.log(`[W2 Extractor] Extracting fields for document ${documentId}...`);
+    console.log(`[TaxForm Extractor] Extracting fields for documentId: ${documentId}, formType: ${formType}...`);
     
     if (!text || text.trim() === '') {
-      console.log(`[W2 Extractor] Document ${documentId} has no text content. Skipping extraction.`);
+      console.log(`[TaxForm Extractor] Document ${documentId} has no text content. Skipping extraction.`);
       return { success: false, error: 'No text content' };
     }
 
@@ -112,19 +113,18 @@ export async function extractAndSaveW2Data(documentId: string, text: string) {
                       process.env.OPENAI_API_KEY !== 'dummy_key_for_build_time';
 
     if (!hasOpenAI) {
-      console.warn(`[W2 Extractor] OpenAI API Key is missing. Skipping AI extraction.`);
+      console.warn(`[TaxForm Extractor] OpenAI API Key is missing. Skipping AI extraction.`);
       return { success: false, error: 'API key missing' };
     }
 
-    const prompt = `You are an expert CPA Tax Assistant. 
-Extract the key W-2 form data from the OCR text below. 
+    // Determine the specific prompts and JSON schemas depending on the form type
+    let promptInstructions = '';
+    let jsonSchemaKeysDescription = '';
+    
+    const lowerFormType = formType.toLowerCase();
 
-Text content:
----
-${text}
----
-
-Your task:
+    if (lowerFormType.includes('w2') || lowerFormType.includes('w-2')) {
+      promptInstructions = `
 Extract the values for the following boxes:
 - Box a: Employee's Social Security Number (employeeSsn) -> Format as string (e.g. "XXX-XX-XXXX"). Look for label "a" or "Employee's social security number".
 - Box b: Employer Identification Number (employerEin) -> Format as string (e.g. "XX-XXXXXXX"). Look for label "b" or "Employer identification number (EIN)".
@@ -135,11 +135,81 @@ Extract the values for the following boxes:
 - Box 5: Medicare wages and tips (medicareWages) -> Numeric value (float or integer). Look for label "5" or "Medicare wages and tips".
 - Box 6: Medicare tax withheld (medicareTax) -> Numeric value (float or integer). Look for label "6" or "Medicare tax withheld".
 
-If a value is missing, set it to null. Do not guess SSN or EIN values; only extract them if present and recognizable.
-Ensure all monetary amounts (Boxes 1-6) are represented as clean numbers (do not include currency symbols or commas in the values, just numbers).
+**Duplicate Prevention**: A single page/sheet may contain multiple copies of the same W-2 form (e.g., Copy B, Copy C, Copy 2, Copy D). Identify if copies are present and extract only ONE unified set of values representing the form (do not duplicate or combine numeric fields, just extract from a single legible copy).
+`;
+      jsonSchemaKeysDescription = `"employeeSsn", "employerEin", "wages", "fedIncomeTax", "socialSecurityWages", "socialSecurityTax", "medicareWages", "medicareTax"`;
+    } else if (lowerFormType.includes('1099-nec')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1099-NEC:
+- Payer's TIN/Employer Identification Number (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Recipient's TIN/SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 1: Nonemployee compensation (nonemployeeCompensation) -> Numeric value (float or integer). Look for label "1" or "Nonemployee compensation".
+- Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer). Look for label "4" or "Federal income tax withheld".
+`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "nonemployeeCompensation", "fedIncomeTax"`;
+    } else if (lowerFormType.includes('1099-misc')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1099-MISC:
+- Payer's TIN/Employer Identification Number (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Recipient's TIN/SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 1: Rents (rents) -> Numeric value (float or integer).
+- Box 2: Royalties (royalties) -> Numeric value (float or integer).
+- Box 3: Other income (otherIncome) -> Numeric value (float or integer).
+- Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer).
+- Box 8: Substitute payments in lieu of dividends or interest (substitutePayments) -> Numeric value (float or integer).
+`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "rents", "royalties", "otherIncome", "fedIncomeTax", "substitutePayments"`;
+    } else if (lowerFormType.includes('1099-int')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1099-INT:
+- Payer's TIN/Employer Identification Number (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Recipient's TIN/SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 1: Interest income (interestIncome) -> Numeric value (float or integer).
+- Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer).
+`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "interestIncome", "fedIncomeTax"`;
+    } else if (lowerFormType.includes('1099-div')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1099-DIV:
+- Payer's TIN/Employer Identification Number (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Recipient's TIN/SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 1a: Total ordinary dividends (totalOrdinaryDividends) -> Numeric value (float or integer).
+- Box 1b: Qualified dividends (qualifiedDividends) -> Numeric value (float or integer).
+- Box 2a: Total capital gain dist. (totalCapitalGainDist) -> Numeric value (float or integer).
+- Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer).
+`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "totalOrdinaryDividends", "qualifiedDividends", "totalCapitalGainDist", "fedIncomeTax"`;
+    } else if (lowerFormType.includes('1099-ssa') || lowerFormType.includes('ssa-1099')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form SSA-1099 (Social Security Benefit Statement):
+- Box 3: Benefits paid (benefitsPaid) -> Numeric value (float or integer).
+- Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer).
+- Box 5: Net benefits (netBenefits) -> Numeric value (float or integer).
+- Payer's TIN/EIN (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Recipient's SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "benefitsPaid", "fedIncomeTax", "netBenefits"`;
+    } else {
+      console.log(`[TaxForm Extractor] Form type "${formType}" is not supported for key boxes extraction. Skipping.`);
+      return { success: true, message: 'Unrecognized tax form type for box extraction' };
+    }
+
+    const prompt = `You are an expert CPA Tax Assistant. 
+Extract key tax data for Form Type: "${formType}" from the OCR text below. 
+
+Text content:
+---
+${text}
+---
+
+Your task:
+${promptInstructions}
+
+If a value is missing, set it to null. Do not guess TIN/SSN/EIN values; only extract them if present and recognizable.
+Ensure all monetary amounts are represented as clean numbers (do not include currency symbols or commas in the values, just numbers).
 
 Format your output as a JSON object with these exact keys:
-"employeeSsn", "employerEin", "wages", "fedIncomeTax", "socialSecurityWages", "socialSecurityTax", "medicareWages", "medicareTax"`;
+${jsonSchemaKeysDescription}`;
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -149,7 +219,7 @@ Format your output as a JSON object with these exact keys:
 
     const parsedData = JSON.parse(response.choices[0].message?.content || '{}');
 
-    // Prepare data by converting numeric fields to Float
+    // Clean up numerical floats and strings
     const cleanFloat = (val: any): number | null => {
       if (val === undefined || val === null || val === '') return null;
       if (typeof val === 'number') return val;
@@ -162,33 +232,36 @@ Format your output as a JSON object with these exact keys:
       return String(val).trim();
     };
 
-    const data = {
-      employeeSsn: cleanStr(parsedData.employeeSsn),
-      employerEin: cleanStr(parsedData.employerEin),
-      wages: cleanFloat(parsedData.wages),
-      fedIncomeTax: cleanFloat(parsedData.fedIncomeTax),
-      socialSecurityWages: cleanFloat(parsedData.socialSecurityWages),
-      socialSecurityTax: cleanFloat(parsedData.socialSecurityTax),
-      medicareWages: cleanFloat(parsedData.medicareWages),
-      medicareTax: cleanFloat(parsedData.medicareTax),
-    };
+    const cleanedBoxes: Record<string, any> = {};
+    for (const key of Object.keys(parsedData)) {
+      const val = parsedData[key];
+      if (key === 'employeeSsn' || key === 'employerEin' || key === 'payerEin' || key === 'recipientSsn') {
+        cleanedBoxes[key] = cleanStr(val);
+      } else {
+        cleanedBoxes[key] = cleanFloat(val);
+      }
+    }
 
-    console.log(`[W2 Extractor] Extracted W2 data for document ${documentId}:`, data);
+    console.log(`[TaxForm Extractor] Cleaned extracted boxes for document ${documentId}:`, cleanedBoxes);
 
     // Save or update in database
-    const w2Record = await prisma.w2Data.upsert({
+    const taxFormRecord = await prisma.taxFormData.upsert({
       where: { documentId },
-      update: data,
+      update: {
+        formType,
+        boxes: cleanedBoxes
+      },
       create: {
         documentId,
-        ...data
+        formType,
+        boxes: cleanedBoxes
       }
     });
 
-    return { success: true, data: w2Record };
+    return { success: true, data: taxFormRecord };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`[W2 Extractor] Error extracting W-2 data for document ${documentId}:`, errorMessage);
+    console.error(`[TaxForm Extractor] Error extracting tax form data for document ${documentId}:`, errorMessage);
     return { success: false, error: errorMessage };
   }
 }

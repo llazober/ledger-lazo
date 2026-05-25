@@ -19,15 +19,9 @@ interface Document {
   confidenceScore: number;
   validationErrors?: string | null;
   createdAt: string;
-  w2Data?: {
-    employeeSsn: string | null;
-    employerEin: string | null;
-    wages: number | null;
-    fedIncomeTax: number | null;
-    socialSecurityWages: number | null;
-    socialSecurityTax: number | null;
-    medicareWages: number | null;
-    medicareTax: number | null;
+  taxFormData?: {
+    formType: string;
+    boxes: Record<string, any>;
   } | null;
 }
 
@@ -42,6 +36,62 @@ interface DocumentVaultProps {
   initialDocs: Document[];
   clients: Client[];
 }
+
+const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?: boolean; isMono?: boolean }[]> = {
+  w2: [
+    { label: "Box a: Employee SSN", key: "employeeSsn", isMono: true },
+    { label: "Box b: Employer EIN", key: "employerEin", isMono: true },
+    { label: "Box 1: Wages/Tips", key: "wages", isMonetary: true },
+    { label: "Box 2: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 3: SS Wages", key: "socialSecurityWages", isMonetary: true },
+    { label: "Box 4: SS Tax Withheld", key: "socialSecurityTax", isMonetary: true },
+    { label: "Box 5: Medicare Wages", key: "medicareWages", isMonetary: true },
+    { label: "Box 6: Medicare Tax", key: "medicareTax", isMonetary: true }
+  ],
+  "1099-nec": [
+    { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
+    { label: "Recipient SSN/TIN", key: "recipientSsn", isMono: true },
+    { label: "Box 1: Nonemployee Comp", key: "nonemployeeCompensation", isMonetary: true },
+    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true }
+  ],
+  "1099-misc": [
+    { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
+    { label: "Recipient SSN/TIN", key: "recipientSsn", isMono: true },
+    { label: "Box 1: Rents", key: "rents", isMonetary: true },
+    { label: "Box 2: Royalties", key: "royalties", isMonetary: true },
+    { label: "Box 3: Other Income", key: "otherIncome", isMonetary: true },
+    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 8: Substitute Payments", key: "substitutePayments", isMonetary: true }
+  ],
+  "1099-int": [
+    { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
+    { label: "Recipient SSN/TIN", key: "recipientSsn", isMono: true },
+    { label: "Box 1: Interest Income", key: "interestIncome", isMonetary: true },
+    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true }
+  ],
+  "1099-div": [
+    { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
+    { label: "Recipient SSN/TIN", key: "recipientSsn", isMono: true },
+    { label: "Box 1a: Ordinary Dividends", key: "totalOrdinaryDividends", isMonetary: true },
+    { label: "Box 1b: Qualified Dividends", key: "qualifiedDividends", isMonetary: true },
+    { label: "Box 2a: Cap Gain Dist", key: "totalCapitalGainDist", isMonetary: true },
+    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true }
+  ],
+  "1099-ssa": [
+    { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
+    { label: "Recipient SSN", key: "recipientSsn", isMono: true },
+    { label: "Box 3: Benefits Paid", key: "benefitsPaid", isMonetary: true },
+    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true }
+  ],
+  "ssa-1099": [
+    { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
+    { label: "Recipient SSN", key: "recipientSsn", isMono: true },
+    { label: "Box 3: Benefits Paid", key: "benefitsPaid", isMonetary: true },
+    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true }
+  ]
+};
 
 const readFileAsBase64 = (file: File | Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -915,56 +965,44 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                 </div>
               </div>
 
-              {activeDoc.category === 'W2' && activeDoc.w2Data && (
-                <div className="bg-[#0a0a0c] p-4 rounded-xl border border-white/5 space-y-3">
-                  <span className="text-[9px] text-[#00f0ff] font-bold block uppercase tracking-wider">Extracted W-2 Form Data</span>
-                  <div className="grid grid-cols-2 gap-3 text-[10px]">
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box a: Employee SSN</span>
-                      <span className="text-white font-mono font-semibold">{activeDoc.w2Data.employeeSsn || 'Not Found'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box b: Employer EIN</span>
-                      <span className="text-white font-mono font-semibold">{activeDoc.w2Data.employerEin || 'Not Found'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 1: Wages/Tips</span>
-                      <span className="text-emerald-400 font-semibold">
-                        {activeDoc.w2Data.wages != null ? `$${activeDoc.w2Data.wages.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+              {activeDoc.taxFormData && activeDoc.taxFormData.boxes && (
+                (() => {
+                  const formTypeKey = activeDoc.taxFormData.formType.toLowerCase();
+                  const boxes = activeDoc.taxFormData.boxes;
+                  const fields = TAX_FORM_LABELS[formTypeKey] || Object.keys(boxes).map(k => ({
+                    label: k.toUpperCase(),
+                    key: k,
+                    isMonetary: typeof boxes[k] === 'number',
+                    isMono: typeof boxes[k] === 'string'
+                  }));
+
+                  return (
+                    <div className="bg-[#0a0a0c] p-4 rounded-xl border border-white/5 space-y-3">
+                      <span className="text-[9px] text-[#00f0ff] font-bold block uppercase tracking-wider">
+                        Extracted {activeDoc.taxFormData.formType} Form Data
                       </span>
+                      <div className="grid grid-cols-2 gap-3 text-[10px]">
+                        {fields.map((field) => {
+                          const val = boxes[field.key];
+                          return (
+                            <div key={field.key}>
+                              <span className="text-slate-500 block text-[8px] uppercase font-bold">{field.label}</span>
+                              {field.isMonetary ? (
+                                <span className={field.key === 'wages' || field.key === 'nonemployeeCompensation' ? "text-emerald-400 font-semibold" : "text-white font-semibold"}>
+                                  {val != null ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                                </span>
+                              ) : (
+                                <span className={field.isMono ? "text-white font-mono font-semibold text-[9px]" : "text-white font-semibold"}>
+                                  {val || 'Not Found'}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 2: Fed Tax Withheld</span>
-                      <span className="text-white font-semibold">
-                        {activeDoc.w2Data.fedIncomeTax != null ? `$${activeDoc.w2Data.fedIncomeTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 3: SS Wages</span>
-                      <span className="text-white font-semibold">
-                        {activeDoc.w2Data.socialSecurityWages != null ? `$${activeDoc.w2Data.socialSecurityWages.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 4: SS Tax Withheld</span>
-                      <span className="text-white font-semibold">
-                        {activeDoc.w2Data.socialSecurityTax != null ? `$${activeDoc.w2Data.socialSecurityTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 5: Medicare Wages</span>
-                      <span className="text-white font-semibold">
-                        {activeDoc.w2Data.medicareWages != null ? `$${activeDoc.w2Data.medicareWages.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 6: Medicare Tax</span>
-                      <span className="text-white font-semibold">
-                        {activeDoc.w2Data.medicareTax != null ? `$${activeDoc.w2Data.medicareTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()
               )}
 
               {activeDoc.validationErrors && (
