@@ -28,9 +28,8 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
   // Dynamically import pdfjs-dist legacy ESM build for compatibility in Node environments
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
-  // Fix: Explicitly resolve pdf.worker.mjs path from the public folder to ensure it is deployed in standalone container builds
-  const workerPath = path.join(process.cwd(), 'public/pdf.worker.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
+  // In Node.js environment, PDF.js loads the worker synchronously in the main thread if workerSrc is not specified, so we don't need to configure workerSrc.
+
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(pdfBuffer),
