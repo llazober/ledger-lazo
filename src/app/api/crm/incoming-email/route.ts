@@ -258,8 +258,18 @@ export async function POST(req: Request) {
         })) : typeof body.inlineAttachments) : null,
       };
       fs.appendFileSync(logPath, JSON.stringify(logEntry, null, 2) + '\n\n');
+
+      // Also save to database ChatMessage table for easy remote query
+      await prisma.chatMessage.create({
+        data: {
+          channel: 'PORTAL',
+          content: `[DEBUG_LOG] ${JSON.stringify(logEntry)}`,
+          isAiGenerated: true,
+          needsHuman: false
+        }
+      });
     } catch (logErr) {
-      console.error("Failed to write to local debug log file:", logErr);
+      console.error("Failed to write debug log (file/db):", logErr);
     }
     
     // Support standard attachments, inline attachments, and potential arrays sent by n8n or mail parsers
