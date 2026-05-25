@@ -273,26 +273,190 @@ Format your output as a JSON object with keys:
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { docId, category, extractedText, aiSummary, taxYear } = body;
+    const { docId, category, extractedText, aiSummary, taxYear, reprocess } = body;
 
     if (!docId) {
       return NextResponse.json({ success: false, error: "docId is required" }, { status: 400 });
     }
 
-    const document = await prisma.document.update({
-      where: { id: docId },
-      data: {
-        ...(category && { category }),
-        ...(extractedText !== undefined && { extractedText }),
-        ...(aiSummary && { aiSummary }),
-        ...(taxYear && { taxYear: parseInt(taxYear) })
-      }
+    const existingDoc = await prisma.document.findUnique({
+      where: { id: docId }
     });
 
-    // Re-generate RAG chunks and embeddings if the text has been edited manually
-    if (extractedText !== undefined) {
+    if (!existingDoc) {
+      return NextResponse.json({ success: false, error: "Document not found" }, { status: 404 });
+    }
+
+    let activeText = existingDoc.extractedText || '';
+    let activeCategory = existingDoc.category || 'UNCLASSIFIED';
+    let activeSummary = existingDoc.aiSummary || '';
+    let confidenceScore = existingDoc.confidenceScore || 0.0;
+    let validationErrors = existingDoc.validationErrors || null;
+    let status = existingDoc.status;
+
+    if (reprocess) {
+      console.log(`[Reprocess] Triggering Vision OCR re-extraction for document ${docId}...`);
+      let rawText = '';
+      let visionOcrSucceeded = false;
+
+      const fileBuffer = existingDoc.fileData ? Buffer.from(existingDoc.fileData, 'base64') : null;
+      const isPdf = existingDoc.name.toLowerCase().endsWith('.pdf') || existingDoc.fileType?.toUpperCase() === 'PDF';
+      const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(existingDoc.fileType?.toLowerCase() || '') ||
+                      /\.(png|jpe?g|webp)$/i.test(existingDoc.name);
+
+      if (isPdf && fileBuffer) {
+        try {
+          const { convertPdfToImages } = await import('@/lib/pdf-converter');
+          const imagesBase64 = await convertPdfToImages(fileBuffer);
+          
+          if (imagesBase64 && imagesBase64.length > 0) {
+            console.log(`[Reprocess] Successfully converted scanned PDF into ${imagesBase64.length} images. Running GPT-4o Vision OCR...`);
+            
+            const messagesContent: any[] = [
+              {
+                type: 'text',
+                text: 'Transcribe ALL visible text from the following document image pages. Perform high-fidelity OCR, preserving all headers, forms, labels, tables, key-value pairs, numbers, boxes, and SSNs/EINs exactly as printed. Do not summarize or omit anything.'
+              }
+            ];
+            
+            for (const imgBase64 of imagesBase64) {
+              messagesContent.push({
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/png;base64,${imgBase64}`
+                }
+              });
+            }
+
+            const visionResponse = await openai.chat.completions.create({
+              model: 'gpt-4o',
+              messages: [{ role: 'user', content: messagesContent }],
+              max_tokens: 4000
+            });
+
+            const visionText = visionResponse.choices[0].message?.content || '';
+            if (visionText && visionText.trim().length > 10) {
+              rawText = visionText;
+              visionOcrSucceeded = true;
+              console.log(`[Reprocess] GPT-4o Vision OCR succeeded! Total transcribed chars: ${visionText.length}`);
+            }
+          }
+        } catch (pdfErr: any) {
+          console.error('[Reprocess] PDF to image Vision OCR failed:', pdfErr);
+        }
+      } else if (isImage && existingDoc.fileData) {
+        try {
+          console.log(`[Reprocess] Running GPT-4o Vision OCR on uploaded image...`);
+          const fileExt = existingDoc.fileType.toLowerCase();
+          const mimeType = fileExt === 'jpg' || fileExt === 'jpeg' ? 'image/jpeg' : `image/${fileExt}`;
+          
+          const visionResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Transcribe ALL visible text from the following document image. Perform high-fidelity OCR, preserving all headers, forms, labels, tables, key-value pairs, numbers, boxes, and SSNs/EINs exactly as printed.'
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${mimeType};base64,${existingDoc.fileData}`
+                  }
+                }
+              ]
+            }],
+            max_tokens: 4000
+          });
+
+          const visionText = visionResponse.choices[0].message?.content || '';
+          if (visionText && visionText.trim().length > 10) {
+            rawText = visionText;
+            visionOcrSucceeded = true;
+            console.log(`[Reprocess] GPT-4o Vision OCR succeeded on image!`);
+          }
+        } catch (imgErr: any) {
+          console.error('[Reprocess] Image Vision OCR failed:', imgErr);
+        }
+      }
+
+      if (visionOcrSucceeded && rawText) {
+        activeText = rawText;
+        
+        const hasOpenAI = process.env.OPENAI_API_KEY && 
+                          process.env.OPENAI_API_KEY !== 'missing_api_key' &&
+                          process.env.OPENAI_API_KEY !== 'dummy_key_for_build_time';
+
+        if (hasOpenAI) {
+          try {
+            const prompt = `You are an expert CPA Tax Assistant.
+Analyze the following raw OCR text extracted from an uploaded client document:
+---
+${rawText}
+---
+
+Your task:
+1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2026, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+4. Estimate your parsing confidence score between 0.0 and 1.0.
+5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+
+Format your output as a JSON object with keys:
+"category", "aiSummary", "confidenceScore", "validationErrors"`;
+
+            const response = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'user', content: prompt }],
+              response_format: { type: "json_object" }
+            });
+
+            const result = JSON.parse(response.choices[0].message?.content || '{}');
+            activeCategory = result.category || activeCategory;
+            activeSummary = result.aiSummary || activeSummary;
+            confidenceScore = result.confidenceScore || confidenceScore;
+            validationErrors = result.validationErrors || null;
+            status = validationErrors ? 'REVIEW_REQUIRED' : 'VALIDATED';
+          } catch (openaiErr) {
+            console.error("[Reprocess] OpenAI processing of raw text failed:", openaiErr);
+          }
+        }
+      } else {
+        return NextResponse.json({ success: false, error: "Vision OCR could not transcribe text from document image data." }, { status: 422 });
+      }
+    }
+
+    let document;
+    if (reprocess) {
+      document = await prisma.document.update({
+        where: { id: docId },
+        data: {
+          category: activeCategory,
+          extractedText: activeText,
+          aiSummary: activeSummary,
+          confidenceScore,
+          validationErrors,
+          status
+        }
+      });
+    } else {
+      document = await prisma.document.update({
+        where: { id: docId },
+        data: {
+          ...(category && { category }),
+          ...(extractedText !== undefined && { extractedText }),
+          ...(aiSummary && { aiSummary }),
+          ...(taxYear && { taxYear: parseInt(taxYear) })
+        }
+      });
+    }
+
+    // Re-generate RAG chunks and embeddings
+    const activeTextVal = reprocess ? activeText : extractedText;
+    if (activeTextVal !== undefined) {
       try {
-        await processDocumentChunks(docId, extractedText);
+        await processDocumentChunks(docId, activeTextVal);
       } catch (chunkErr) {
         console.error("Failed to update document chunks after PATCH:", chunkErr);
       }
@@ -300,17 +464,25 @@ export async function PATCH(req: Request) {
 
     // Extract tax form fields if category is W2 or 1099 and we have text
     if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099')) {
-      const activeText = extractedText !== undefined ? extractedText : document.extractedText;
-      if (activeText) {
+      const activeTextForForm = reprocess ? activeText : (extractedText !== undefined ? extractedText : document.extractedText);
+      if (activeTextForForm) {
         try {
-          await extractAndSaveTaxFormData(docId, document.category, activeText);
+          await extractAndSaveTaxFormData(docId, document.category, activeTextForForm);
         } catch (tfErr) {
           console.error("Failed to extract tax form data after PATCH:", tfErr);
         }
       }
     }
 
-    return NextResponse.json({ success: true, document });
+    // Fetch updated document with relation loaded to return to UI
+    const updatedDocument = await prisma.document.findUnique({
+      where: { id: docId },
+      include: {
+        taxFormData: true
+      }
+    });
+
+    return NextResponse.json({ success: true, document: updatedDocument });
   } catch (error: any) {
     console.error('Update Document Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
