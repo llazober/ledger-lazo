@@ -137,11 +137,28 @@ Extract the values for the following boxes:
 - Box a: Employee's Social Security Number (employeeSsn) -> Format as string (e.g. "XXX-XX-XXXX"). Look for label "a" or "Employee's social security number".
 - Box b: Employer Identification Number (employerEin) -> Format as string (e.g. "XX-XXXXXXX"). Look for label "b" or "Employer identification number (EIN)".
 - Box 1: Wages, tips, other compensation (wages) -> Numeric value (float or integer). Look for label "1" or "Wages, tips, other compensation".
-- Box 2: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer). Look for label "2" or "Federal income tax withheld".
+- Box 2: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer). Look for label "2" or "Federal income tax withheld". Typically, this is a significant portion of wages (e.g. 10% - 30% of Box 1) and is completely different from Box 6.
 - Box 3: Social security wages (socialSecurityWages) -> Numeric value (float or integer). Look for label "3" or "Social security wages".
 - Box 4: Social security tax withheld (socialSecurityTax) -> Numeric value (float or integer). Look for label "4" or "Social security tax withheld".
 - Box 5: Medicare wages and tips (medicareWages) -> Numeric value (float or integer). Look for label "5" or "Medicare wages and tips".
-- Box 6: Medicare tax withheld (medicareTax) -> Numeric value (float or integer). Look for label "6" or "Medicare tax withheld".
+- Box 6: Medicare tax withheld (medicareTax) -> Numeric value (float or integer). Look for label "6" or "Medicare tax withheld". Usually a much smaller amount (1.45% of wages).
+
+**Layout Rules & Column Resolution**:
+W-2 forms are arranged in side-by-side columns:
+- Box 1 (Wages) is next to Box 2 (Federal income tax). 
+- Box 3 (SS Wages) is next to Box 4 (SS Tax).
+- Box 5 (Medicare Wages) is next to Box 6 (Medicare Tax).
+
+When standard OCR transcribes the text horizontally line-by-line, it typically reads:
+"[Label Box 1] [Label Box 2] [Value Box 1] [Value Box 2]" 
+For example: "1 Wages, tips, other comp. 2 Federal income tax withheld 93818.21 13221.63".
+- You MUST map the first number (e.g. 93818.21) to Box 1 (wages).
+- You MUST map the second number (e.g. 13221.63) to Box 2 (fedIncomeTax).
+- Do NOT skip the Box 2 value or copy the Box 6 value (e.g. 1360.36) into Box 2.
+
+Apply this same relative column alignment mapping for Box 3 & 4, and Box 5 & 6:
+- For "3 Social security wages 4 Social security tax withheld 93818.21 5816.73", Box 3 is 93818.21 and Box 4 is 5816.73.
+- For "5 Medicare wages and tips 6 Medicare tax withheld 93818.21 1360.36", Box 5 is 93818.21 and Box 6 is 1360.36.
 
 **Duplicate Prevention**: A single page/sheet may contain multiple copies of the same W-2 form (e.g., Copy B, Copy C, Copy 2, Copy D). Identify if copies are present and extract only ONE unified set of values representing the form (do not duplicate or combine numeric fields, just extract from a single legible copy).
 `;
