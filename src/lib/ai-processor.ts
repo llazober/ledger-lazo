@@ -285,6 +285,11 @@ On all 1099 forms:
 - Note that in raw horizontal OCR, these numbers appear side-by-side: PAYER'S TIN is printed on the LEFT and RECIPIENT'S TIN is printed on the RIGHT. If you see the text line "22-1513100 44-4440062" under "PAYER'S TIN RECIPIENT'S TIN", the LEFT one (22-1513100) is the Payer's EIN, and the RIGHT one (44-4440062) is the Recipient's TIN/SSN. Do NOT swap them!
 ` : ''}
 
+**CRITICAL DUPLICATE/MULTI-COPY PREVENTION RULE**:
+Many tax documents (especially Form 1099s and W-2s) print multiple copies of the exact same form on a single page (e.g. Copy B on the top half and Copy 2 on the bottom half, or multiple identical sections).
+You MUST extract values from ONLY ONE copy. Do NOT sum, multiply, double, or combine the dollar values from the different copies or halves. If Box 1 shows 4235.76 in both the top half and bottom half, the Box 1 value is 4235.76, NOT 8471.52.
+
+
 If a value is missing, set it to null. Do not guess TIN/SSN/EIN values; only extract them if present and recognizable.
 Ensure all monetary amounts are represented as clean numbers (do not include currency symbols or commas in the values, just numbers).
 

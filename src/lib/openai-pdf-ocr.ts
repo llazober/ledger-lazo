@@ -1,11 +1,5 @@
 import OpenAI, { toFile } from 'openai';
-import { createCanvas } from '@napi-rs/canvas';
-
-if (typeof (global as any).DOMMatrix === 'undefined') {
-  (global as any).DOMMatrix = class {};
-}
-// Require legacy build for node.js compatibility
-const pdfjs = require('pdfjs-dist/legacy/build/pdf.mjs');
+import { convertPdfToImages } from './pdf-converter';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -27,30 +21,12 @@ export async function performVisionOcrWithFilesApi(fileBuffer: Buffer, filename:
 
   // 1. First attempt: Render PDF pages to PNG and send via detail: high vision completions
   try {
-    console.log(`[OpenAI OCR] Attempting to render PDF "${filename}" pages to PNG...`);
-    const data = new Uint8Array(fileBuffer);
-    const loadingTask = pdfjs.getDocument({ data });
-    const pdf = await loadingTask.promise;
-    console.log(`[OpenAI OCR] PDF loaded. Total pages: ${pdf.numPages}`);
+    console.log(`[OpenAI OCR] Attempting to render PDF "${filename}" pages to PNG using convertPdfToImages...`);
+    const pagesBase64 = await convertPdfToImages(fileBuffer, 4);
+    console.log(`[OpenAI OCR] PDF loaded. Total rendered pages: ${pagesBase64.length}`);
     
-    // Scanned tax returns/statements are typically 1-3 pages. We cap at 4 pages to avoid token limits.
-    const maxPages = Math.min(pdf.numPages, 4);
     const imageMessages: any[] = [];
-    
-    for (let i = 1; i <= maxPages; i++) {
-      console.log(`[OpenAI OCR] Rendering page ${i}...`);
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 2.0 }); // 2x scale for high-fidelity OCR reading
-      const canvas = createCanvas(viewport.width, viewport.height);
-      const context = canvas.getContext('2d');
-      
-      await page.render({
-        canvasContext: context,
-        viewport: viewport
-      }).promise;
-      
-      const pngBuffer = canvas.toBuffer('image/png');
-      const base64 = pngBuffer.toString('base64');
+    for (const base64 of pagesBase64) {
       imageMessages.push({
         type: 'image_url',
         image_url: {
@@ -72,7 +48,8 @@ CRITICAL RULES:
 3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN.
    NOTE: On all Form 1099 variants, "PAYER'S TIN" is in the left box and "RECIPIENT'S TIN" is in the right box. Ensure the LEFT value is mapped to Payer's TIN/EIN, and the RIGHT value is mapped to Recipient's TIN/SSN. Do not swap them.
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
-5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.
+5. MULTI-COPY / DUPLICATE PREVENTION: Many tax documents (especially Form 1099s and W-2s) print multiple copies of the same form on a single page (e.g. Copy B on the top half and Copy 2 on the bottom half). 
+   You MUST transcribe the boxes from ONLY ONE copy. Do NOT sum, multiply, double, or combine the dollar values from the different copies or halves. If Box 1 shows 4235.76 in both the top half and bottom half, the Box 1 value is 4235.76, NOT 8471.52.
 6. For Form 1095-A (Health Insurance Marketplace Statement):
    - Box 2 Marketplace-assigned policy number: Extract this value exactly as written (e.g. 188281014).
    - Box 5 Recipient's SSN: Read the digits with extreme precision. Do NOT confuse 90 and 09, or 1490 and 1409. (e.g. "xxx-xx-1490").
@@ -138,7 +115,8 @@ CRITICAL RULES:
 3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN.
    NOTE: On all Form 1099 variants, "PAYER'S TIN" is in the left box and "RECIPIENT'S TIN" is in the right box. Ensure the LEFT value is mapped to Payer's TIN/EIN, and the RIGHT value is mapped to Recipient's TIN/SSN. Do not swap them.
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
-5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.
+5. MULTI-COPY / DUPLICATE PREVENTION: Many tax documents (especially Form 1099s and W-2s) print multiple copies of the same form on a single page (e.g. Copy B on the top half and Copy 2 on the bottom half). 
+   You MUST transcribe the boxes from ONLY ONE copy. Do NOT sum, multiply, double, or combine the dollar values from the different copies or halves. If Box 1 shows 4235.76 in both the top half and bottom half, the Box 1 value is 4235.76, NOT 8471.52.
 6. For Form 1095-A (Health Insurance Marketplace Statement):
    - Box 2 Marketplace-assigned policy number: Extract this value exactly as written (e.g. 188281014).
    - Box 5 Recipient's SSN: Read the digits with extreme precision. Do NOT confuse 90 and 09, or 1490 and 1409. (e.g. "xxx-xx-1490").
