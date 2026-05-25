@@ -46,7 +46,12 @@ CRITICAL RULES:
    NOTE: On all Form 1099 variants, "PAYER'S TIN" is in the left box and "RECIPIENT'S TIN" is in the right box. Ensure the LEFT value is mapped to Payer's TIN/EIN, and the RIGHT value is mapped to Recipient's TIN/SSN. Do not swap them.
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
 5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.
-6. For Form 1095-A, you MUST fully transcribe the Part III table, listing every month from January to December and especially Row 33 "Annual Totals" for Column A, Column B, and Column C (do not truncate, summarize, or skip this section).`
+6. For Form 1095-A Part III (Coverage Information), you MUST fully transcribe the table row-by-row and column-by-column, listing all months (January-December) and Row 33 (Annual Totals).
+   Format each month and the totals row exactly like this to ensure no columns are skipped:
+   - [Month]: Column A = [value], Column B = [value], Column C = [value]
+   - 33 Annual Totals: Column A = [value], Column B = [value], Column C = [value]
+   (e.g., "33 Annual Totals: Column A = 12230.40, Column B = 12610.80, Column C = 11472.00")
+   Do NOT skip any column or monthly values.`
             },
             {
               type: 'file',
