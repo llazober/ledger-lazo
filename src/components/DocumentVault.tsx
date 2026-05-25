@@ -19,6 +19,16 @@ interface Document {
   confidenceScore: number;
   validationErrors?: string | null;
   createdAt: string;
+  w2Data?: {
+    employeeSsn: string | null;
+    employerEin: string | null;
+    wages: number | null;
+    fedIncomeTax: number | null;
+    socialSecurityWages: number | null;
+    socialSecurityTax: number | null;
+    medicareWages: number | null;
+    medicareTax: number | null;
+  } | null;
 }
 
 interface Client {
@@ -904,6 +914,58 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                   <span className="text-xs text-white font-bold block mt-0.5">TY {activeDoc.taxYear}</span>
                 </div>
               </div>
+
+              {activeDoc.category === 'W2' && activeDoc.w2Data && (
+                <div className="bg-[#0a0a0c] p-4 rounded-xl border border-white/5 space-y-3">
+                  <span className="text-[9px] text-[#00f0ff] font-bold block uppercase tracking-wider">Extracted W-2 Form Data</span>
+                  <div className="grid grid-cols-2 gap-3 text-[10px]">
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box a: Employee SSN</span>
+                      <span className="text-white font-mono font-semibold">{activeDoc.w2Data.employeeSsn || 'Not Found'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box b: Employer EIN</span>
+                      <span className="text-white font-mono font-semibold">{activeDoc.w2Data.employerEin || 'Not Found'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 1: Wages/Tips</span>
+                      <span className="text-emerald-400 font-semibold">
+                        {activeDoc.w2Data.wages != null ? `$${activeDoc.w2Data.wages.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 2: Fed Tax Withheld</span>
+                      <span className="text-white font-semibold">
+                        {activeDoc.w2Data.fedIncomeTax != null ? `$${activeDoc.w2Data.fedIncomeTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 3: SS Wages</span>
+                      <span className="text-white font-semibold">
+                        {activeDoc.w2Data.socialSecurityWages != null ? `$${activeDoc.w2Data.socialSecurityWages.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 4: SS Tax Withheld</span>
+                      <span className="text-white font-semibold">
+                        {activeDoc.w2Data.socialSecurityTax != null ? `$${activeDoc.w2Data.socialSecurityTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 5: Medicare Wages</span>
+                      <span className="text-white font-semibold">
+                        {activeDoc.w2Data.medicareWages != null ? `$${activeDoc.w2Data.medicareWages.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block text-[8px] uppercase font-bold">Box 6: Medicare Tax</span>
+                      <span className="text-white font-semibold">
+                        {activeDoc.w2Data.medicareTax != null ? `$${activeDoc.w2Data.medicareTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {activeDoc.validationErrors && (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/15 text-rose-400 rounded-xl text-[10px] leading-relaxed flex items-start gap-2">

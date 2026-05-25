@@ -22,6 +22,7 @@ export default async function DocumentsPage() {
         aiSummary: true,
         confidenceScore: true,
         validationErrors: true,
+        w2Data: true,
         createdAt: true,
         updatedAt: true
       },
@@ -98,6 +99,7 @@ export default async function DocumentsPage() {
           aiSummary: true,
           confidenceScore: true,
           validationErrors: true,
+          w2Data: true,
           createdAt: true,
           updatedAt: true
         },
@@ -110,7 +112,8 @@ export default async function DocumentsPage() {
       extractedText: doc.extractedText || null,
       aiSummary: doc.aiSummary || null,
       validationErrors: doc.validationErrors || null,
-      createdAt: doc.createdAt.toISOString()
+      createdAt: doc.createdAt.toISOString(),
+      w2Data: doc.w2Data || null
     }));
 
     const serializedClients = clients.map((client: any) => ({
