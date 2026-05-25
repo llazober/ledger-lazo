@@ -98,7 +98,7 @@ CRITICAL RULES:
       const resultText = response.choices[0].message?.content || '';
       console.log(`[OpenAI OCR] GPT-4o image vision transcription completed. Length: ${resultText.length}`);
       if (resultText.trim().length > 10) {
-        return resultText;
+        return '[OCR_METHOD: CANVAS]\n' + resultText;
       }
     }
   } catch (err: any) {
@@ -155,7 +155,7 @@ CRITICAL RULES:
 
     const resultText = response.choices[0].message?.content || '';
     console.log(`[OpenAI OCR] GPT-4o transcription completed. Length: ${resultText.length}`);
-    return resultText;
+    return '[OCR_METHOD: FILES_API]\n' + resultText;
   } catch (err: any) {
     console.error('[OpenAI OCR] Error performing PDF vision OCR:', err.message);
     throw err;
