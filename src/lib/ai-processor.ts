@@ -234,11 +234,13 @@ Extract the values for the following boxes of Form 1095-A (Health Insurance Mark
 
 **Layout & Correlation Rules**:
 - Recipient's SSN is in Box 5 (above the spouse section). Spouse's SSN is in Box 8. Do not swap them.
+- Read Box 5 and Box 8 with extreme care and do not make OCR typos or shift digits (e.g. "xxx-xx-1490" vs. "xxx-xx-1419").
 - In Part III (Coverage Information), Row 33 lists the "Annual Totals" for Column A, Column B, and Column C.
 - Column A (Enrollment Premiums) is on the left of the table.
 - Column B (Second Lowest Cost Silver Plan / SLCSP) is in the middle of the table.
 - Column C (Advance Payment of Premium Tax Credit / APTC) is on the right of the table.
 - You MUST map the left value (e.g., 12230.40) to "annualEnrollmentPremiums", the middle value (e.g., 12610.80) to "annualSlcspPremium", and the right value (e.g., 11472.00) to "annualAdvancePtc". Do NOT swap or shift them.
+- Do NOT hallucinate covered individuals or spouse SSNs if they are not explicitly present.
 `;
       jsonSchemaKeysDescription = `"marketplaceIdentifier", "policyNumber", "recipientName", "recipientSsn", "spouseSsn", "policyStartDate", "policyTerminationDate", "annualEnrollmentPremiums", "annualSlcspPremium", "annualAdvancePtc"`;
     } else if (lowerFormType.includes('1099-ssa') || lowerFormType.includes('ssa-1099')) {
@@ -319,7 +321,7 @@ ${jsonSchemaKeysDescription}`;
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       messages,
       response_format: { type: "json_object" }
     });
