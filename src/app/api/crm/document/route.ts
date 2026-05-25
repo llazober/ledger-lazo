@@ -112,18 +112,11 @@ export async function POST(req: Request) {
         const cleanText = rawText.replace(/[\s\-\d]/g, '');
         const isLikelyScannedPdf = isPdf && cleanText.length < 50;
 
+        let visionOcrSucceeded = false;
         if (isLikelyScannedPdf && process.env.OPENAI_API_KEY) {
-          console.log('[Document Route] Scanned PDF detected — using gpt-4o Vision OCR...');
+          console.log('[Document Route] Scanned PDF detected — using gpt-4o Vision OCR with application/pdf...');
           try {
-            // Strategy: upload the PDF to OpenAI Files API, then ask gpt-4o to read it
-            const { toFile } = await import('openai');
-            const pdfBlob = new Blob([fileBuffer], { type: 'application/pdf' });
-            const uploadedFile = await openai.files.create({
-              file: await toFile(pdfBlob, (name || 'document.pdf'), { type: 'application/pdf' }),
-              purpose: 'assistants'
-            });
-            console.log('[Document Route] PDF uploaded to OpenAI Files API:', uploadedFile.id);
-
+            // Send PDF directly as application/pdf base64 — GPT-4o supports this natively
             const visionResponse = await openai.chat.completions.create({
               model: 'gpt-4o',
               messages: [
@@ -146,7 +139,7 @@ CRITICAL RULES:
                     {
                       type: 'image_url',
                       image_url: {
-                        url: `data:image/jpeg;base64,${fileData}`,
+                        url: `data:application/pdf;base64,${fileData}`,
                         detail: 'high'
                       }
                     }
@@ -156,23 +149,15 @@ CRITICAL RULES:
               max_tokens: 2000
             });
 
-            // Cleanup uploaded file
-            await openai.files.delete(uploadedFile.id).catch(() => {});
-
             const visionText = visionResponse.choices[0].message?.content || '';
             if (visionText && visionText.trim().length > 50) {
               rawText = visionText;
               extractedText = visionText;
-              console.log('[Document Route] gpt-4o OCR succeeded. Text length:', visionText.length);
+              visionOcrSucceeded = true;
+              console.log('[Document Route] gpt-4o PDF OCR succeeded. Text length:', visionText.length);
             } else {
-              console.warn('[Document Route] gpt-4o OCR returned minimal text.');
-              validationErrors = 'Scanned document could not be fully parsed. Manual review recommended.';
-            }
-          } catch (visionFallbackErr: any) {
-            console.error('[Document Route] gpt-4o OCR fallback failed:', visionFallbackErr?.message);
-            // Last resort: try sending as JPEG base64 directly to Vision
-            try {
-              console.log('[Document Route] Trying direct base64 JPEG fallback...');
+              console.warn('[Document Route] gpt-4o PDF OCR returned minimal text. Trying JPEG fallback...');
+              // Last resort: try as JPEG in case this is a PDF that embeds a single image page
               const visionResponse2 = await openai.chat.completions.create({
                 model: 'gpt-4o',
                 messages: [
@@ -181,12 +166,12 @@ CRITICAL RULES:
                     content: [
                       {
                         type: 'text',
-                        text: 'Transcribe ALL text from this tax form image precisely. Include form type, box numbers, labels, all dollar values, TINs/SSNs/EINs, and names.'
+                        text: 'Transcribe ALL text from this tax form precisely. Include form type, box numbers, labels, all dollar values, TINs/SSNs/EINs, and names.'
                       },
                       {
                         type: 'image_url',
                         image_url: {
-                          url: `data:image/jpeg;base64,${fileData}`,
+                          url: `data:application/pdf;base64,${fileData}`,
                           detail: 'high'
                         }
                       }
@@ -199,12 +184,15 @@ CRITICAL RULES:
               if (fallbackText && fallbackText.trim().length > 50) {
                 rawText = fallbackText;
                 extractedText = fallbackText;
-                console.log('[Document Route] JPEG fallback OCR succeeded. Text length:', fallbackText.length);
+                visionOcrSucceeded = true;
+                console.log('[Document Route] PDF fallback OCR succeeded. Text length:', fallbackText.length);
+              } else {
+                validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
               }
-            } catch (lastErr: any) {
-              console.error('[Document Route] All OCR strategies failed:', lastErr?.message);
-              validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
             }
+          } catch (visionFallbackErr: any) {
+            console.error('[Document Route] gpt-4o Vision OCR failed:', visionFallbackErr?.message);
+            validationErrors = 'Scanned document could not be parsed. Upload as PNG/JPG for best results.';
           }
         }
 
@@ -240,12 +228,14 @@ Format your output as a JSON object with keys:
             category = result.category || category;
             confidenceScore = result.confidenceScore || confidenceScore;
 
-            if (isLikelyScannedPdf) {
-              aiSummary = (result.aiSummary || '') + " (Note: This appears to be a scanned document with limited text overlay. For full OCR transcription, please save it as a PNG/JPG image file and upload it again.)";
-              validationErrors = result.validationErrors || "Scanned document detected. Standard text layer is empty. Check manually or upload as PNG/JPG image.";
+            if (isLikelyScannedPdf && !visionOcrSucceeded) {
+              // Vision OCR failed — add a note so the accountant knows to re-upload as PNG/JPG
+              aiSummary = (result.aiSummary || '') + " (Note: This appears to be a scanned document. For best OCR results, upload as PNG/JPG image.)";
+              validationErrors = result.validationErrors || "Scanned document detected. Text layer is empty and Vision OCR could not extract content. Re-upload as PNG/JPG for full extraction.";
             } else {
+              // Either not a scanned PDF or Vision OCR succeeded — use classifier result cleanly
               aiSummary = result.aiSummary || aiSummary;
-              validationErrors = result.validationErrors || validationErrors;
+              validationErrors = result.validationErrors || null;
             }
           } catch (openaiErr) {
             console.error("OpenAI processing of raw text failed:", openaiErr);

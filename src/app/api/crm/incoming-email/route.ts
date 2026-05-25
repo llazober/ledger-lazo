@@ -337,7 +337,7 @@ CRITICAL RULES:
                       {
                         type: 'image_url',
                         image_url: {
-                          url: `data:image/jpeg;base64,${finalBase64}`,
+                          url: `data:application/pdf;base64,${finalBase64}`,
                           detail: 'high'
                         }
                       }
