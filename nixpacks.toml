@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_22"]
+nixPkgs = ["nodejs_22", "fontconfig", "freetype"]
 
 [phases.install]
 cmds = ["npm install --legacy-peer-deps"]
