@@ -238,6 +238,13 @@ ${text}
 
 Your task:
 ${promptInstructions}
+${lowerFormType.includes('1099') ? `
+**CRITICAL 1099 TIN SWAP PREVENTION RULE**:
+On all 1099 forms:
+- "payerEin" MUST be the Payer's TIN/EIN (associated with the paying company, e.g., Falcor Engineering Corporation, often starting with NJ/state EIN prefixes like 22- or 44-).
+- "recipientSsn" (or "recipientTin") MUST be the Recipient's TIN/SSN (associated with the receiving individual or LLC, e.g., Alexander Loo).
+- Note that in raw horizontal OCR, these numbers appear side-by-side: PAYER'S TIN is printed on the LEFT and RECIPIENT'S TIN is printed on the RIGHT. If you see the text line "22-1513100 44-4440062" under "PAYER'S TIN RECIPIENT'S TIN", the LEFT one (22-1513100) is the Payer's EIN, and the RIGHT one (44-4440062) is the Recipient's TIN/SSN. Do NOT swap them!
+` : ''}
 
 If a value is missing, set it to null. Do not guess TIN/SSN/EIN values; only extract them if present and recognizable.
 Ensure all monetary amounts are represented as clean numbers (do not include currency symbols or commas in the values, just numbers).

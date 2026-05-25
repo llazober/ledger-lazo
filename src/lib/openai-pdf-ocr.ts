@@ -42,7 +42,8 @@ CRITICAL RULES:
 1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC")
 2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
    Example: "Box 1 Nonemployee compensation: 1600.00"
-3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN
+3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN.
+   NOTE: On all Form 1099 variants, "PAYER'S TIN" is in the left box and "RECIPIENT'S TIN" is in the right box. Ensure the LEFT value is mapped to Payer's TIN/EIN, and the RIGHT value is mapped to Recipient's TIN/SSN. Do not swap them.
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
 5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.`
             },
