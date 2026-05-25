@@ -62,31 +62,43 @@ export async function performVisionOcrWithFilesApi(fileBuffer: Buffer, filename:
     
     if (imageMessages.length > 0) {
       console.log(`[OpenAI OCR] Successfully rendered ${imageMessages.length} pages. Calling GPT-4o Vision with high detail...`);
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `You are an expert tax document OCR system.
+      const systemInstruction = `You are an expert tax document OCR system.
 Carefully transcribe ALL visible text from this scanned tax document.
 
 CRITICAL RULES:
 1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC", "Form 1095-A", "Form 1099-R")
-2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
+2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line.
    Example: "Box 1 Nonemployee compensation: 1600.00"
 3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN.
    NOTE: On all Form 1099 variants, "PAYER'S TIN" is in the left box and "RECIPIENT'S TIN" is in the right box. Ensure the LEFT value is mapped to Payer's TIN/EIN, and the RIGHT value is mapped to Recipient's TIN/SSN. Do not swap them.
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
 5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.
-6. For Form 1095-A Part III (Coverage Information), you MUST fully transcribe the table row-by-row and column-by-column, listing all months (January-December) and Row 33 (Annual Totals).
-   Format each month and the totals row exactly like this to ensure no columns are skipped:
-   - [Month]: Column A = [value], Column B = [value], Column C = [value]
-   - 33 Annual Totals: Column A = [value], Column B = [value], Column C = [value]
-   (e.g., "33 Annual Totals: Column A = 12230.40, Column B = 12610.80, Column C = 11472.00")
-   Do NOT skip any column or monthly values.`
+6. For Form 1095-A (Health Insurance Marketplace Statement):
+   - Box 2 Marketplace-assigned policy number: Extract this value exactly as written (e.g. 188281014).
+   - Box 5 Recipient's SSN: Read the digits with extreme precision. Do NOT confuse 90 and 09, or 1490 and 1409. (e.g. "xxx-xx-1490").
+   - Box 8 Recipient's spouse's SSN: Read the digits with extreme precision (e.g. "xxx-xx-0174").
+   - Part III (Coverage Information): You MUST transcribe all 3 columns (A, B, and C) for every month and Row 33 (Annual Totals).
+     * Column A: Monthly enrollment premiums (leftmost column)
+     * Column B: Monthly second lowest cost silver plan (SLCSP) premium (middle column)
+     * Column C: Monthly advance payment of premium tax credit (rightmost column)
+     Format each month and Row 33 exactly like this, using standard dollar values:
+     - [Month]: Column A = [value], Column B = [value], Column C = [value]
+     - 33 Annual Totals: Column A = [value], Column B = [value], Column C = [value]
+     Example: "33 Annual Totals: Column A = 12230.40, Column B = 12610.80, Column C = 11472.00"`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemInstruction
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Here is the scanned tax document. Please transcribe all text following the system instructions.'
               },
               ...imageMessages
             ]
@@ -116,31 +128,43 @@ CRITICAL RULES:
     fileId = file.id;
     console.log(`[OpenAI OCR] File uploaded successfully. ID: ${fileId}. Calling GPT-4o...`);
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `You are an expert tax document OCR system.
+    const systemInstruction = `You are an expert tax document OCR system.
 Carefully transcribe ALL visible text from this scanned tax document.
 
 CRITICAL RULES:
 1. Capture the FORM TYPE exactly (e.g. "Form 1099-NEC", "Form W-2", "Form 1099-MISC", "Form 1095-A", "Form 1099-R")
-2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line
+2. Capture every box NUMBER and its LABEL and its DOLLAR VALUE on the same line.
    Example: "Box 1 Nonemployee compensation: 1600.00"
 3. Capture Payer name, Payer TIN/EIN, Recipient name, Recipient TIN/SSN.
    NOTE: On all Form 1099 variants, "PAYER'S TIN" is in the left box and "RECIPIENT'S TIN" is in the right box. Ensure the LEFT value is mapped to Payer's TIN/EIN, and the RIGHT value is mapped to Recipient's TIN/SSN. Do not swap them.
 4. Do NOT summarize. Transcribe the actual text exactly as printed.
 5. If multiple copies of the same form appear (Copy B, Copy C), transcribe only ONE copy.
-6. For Form 1095-A Part III (Coverage Information), you MUST fully transcribe the table row-by-row and column-by-column, listing all months (January-December) and Row 33 (Annual Totals).
-   Format each month and the totals row exactly like this to ensure no columns are skipped:
-   - [Month]: Column A = [value], Column B = [value], Column C = [value]
-   - 33 Annual Totals: Column A = [value], Column B = [value], Column C = [value]
-   (e.g., "33 Annual Totals: Column A = 12230.40, Column B = 12610.80, Column C = 11472.00")
-   Do NOT skip any column or monthly values.`
+6. For Form 1095-A (Health Insurance Marketplace Statement):
+   - Box 2 Marketplace-assigned policy number: Extract this value exactly as written (e.g. 188281014).
+   - Box 5 Recipient's SSN: Read the digits with extreme precision. Do NOT confuse 90 and 09, or 1490 and 1409. (e.g. "xxx-xx-1490").
+   - Box 8 Recipient's spouse's SSN: Read the digits with extreme precision (e.g. "xxx-xx-0174").
+   - Part III (Coverage Information): You MUST transcribe all 3 columns (A, B, and C) for every month and Row 33 (Annual Totals).
+     * Column A: Monthly enrollment premiums (leftmost column)
+     * Column B: Monthly second lowest cost silver plan (SLCSP) premium (middle column)
+     * Column C: Monthly advance payment of premium tax credit (rightmost column)
+     Format each month and Row 33 exactly like this, using standard dollar values:
+     - [Month]: Column A = [value], Column B = [value], Column C = [value]
+     - 33 Annual Totals: Column A = [value], Column B = [value], Column C = [value]
+     Example: "33 Annual Totals: Column A = 12230.40, Column B = 12610.80, Column C = 11472.00"`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: systemInstruction
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Here is the scanned tax document. Please transcribe all text following the system instructions.'
             },
             {
               type: 'file',
