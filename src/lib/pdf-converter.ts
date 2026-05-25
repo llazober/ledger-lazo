@@ -1,4 +1,6 @@
 import { createCanvas, Path2D } from '@napi-rs/canvas';
+import path from 'path';
+import { pathToFileURL } from 'url';
 
 /**
  * Converts a PDF buffer into an array of base64-encoded PNG image strings.
@@ -25,6 +27,10 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
 
   // Dynamically import pdfjs-dist legacy ESM build for compatibility in Node environments
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+  // Fix: Explicitly resolve pdf.worker.mjs path from the public folder to ensure it is deployed in standalone container builds
+  const workerPath = path.join(process.cwd(), 'public/pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(pdfBuffer),
