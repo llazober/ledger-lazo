@@ -200,6 +200,8 @@ Format your output as a JSON object with keys:
       }
     });
 
+    let finalDocument = document;
+
     // Generate RAG chunks and embeddings
     if (extractedText) {
       try {
@@ -215,10 +217,25 @@ Format your output as a JSON object with keys:
         } catch (tfErr) {
           console.error("Failed to extract tax form data on create:", tfErr);
         }
+
+        // Run PDF-to-Image dual-pass validation
+        const isPdf = fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+        if (isPdf && fileData) {
+          try {
+            const { verifyPdfDocument } = await import('@/lib/pdf-image-verifier');
+            const fileBuffer = Buffer.from(fileData, 'base64');
+            const verifiedDoc = await verifyPdfDocument(document.id, fileBuffer);
+            if (verifiedDoc) {
+              finalDocument = verifiedDoc;
+            }
+          } catch (verifyErr) {
+            console.error("Failed to perform dual-pass image verification:", verifyErr);
+          }
+        }
       }
     }
 
-    return NextResponse.json({ success: true, document });
+    return NextResponse.json({ success: true, document: finalDocument });
   } catch (error: any) {
     console.error('Create Document Log Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

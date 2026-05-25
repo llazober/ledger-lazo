@@ -443,6 +443,8 @@ export async function POST(req: Request) {
         }
       });
 
+      let finalDoc = doc;
+
       // Generate RAG chunks and embeddings so it is indexed for search
       if (extractedText) {
         try {
@@ -458,10 +460,25 @@ export async function POST(req: Request) {
           } catch (tfErr) {
             console.error("Failed to extract tax form data for email attachment:", tfErr);
           }
+
+          // Run PDF-to-Image dual-pass validation
+          const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+          if (isPdf && finalBase64) {
+            try {
+              const { verifyPdfDocument } = await import('@/lib/pdf-image-verifier');
+              const fileBuffer = Buffer.from(finalBase64, 'base64');
+              const verifiedDoc = await verifyPdfDocument(doc.id, fileBuffer);
+              if (verifiedDoc) {
+                finalDoc = verifiedDoc;
+              }
+            } catch (verifyErr) {
+              console.error("Failed to perform dual-pass image verification on email attachment:", verifyErr);
+            }
+          }
         }
       }
 
-      createdDocuments.push(doc);
+      createdDocuments.push(finalDoc);
     }
 
     // 3. Get all client documents to audit completeness
