@@ -60,7 +60,7 @@ Format your output as a JSON object with keys:
 }
 
 function fallbackClassifier(filename: string) {
-  const nameLower = filename.toLowerCase();
+  const nameLower = (filename || '').toLowerCase();
   let category = 'UNCLASSIFIED';
   let aiSummary = 'Document uploaded via email.';
   let confidenceScore = 0.7;
@@ -208,10 +208,39 @@ export async function POST(req: Request) {
 
     // 2. Process attachments and perform AI classification
     const createdDocuments = [];
-    const attachmentsList = attachments || body.attachment || body.files || body.file || [];
+    
+    // Support standard attachments, inline attachments, and potential arrays sent by n8n or mail parsers
+    const rawAttachments = [
+      ...(attachments || []),
+      ...(body.attachments || []),
+      ...(body.inlineAttachments || []),
+      ...(body.attachment ? (Array.isArray(body.attachment) ? body.attachment : [body.attachment]) : []),
+      ...(body.files || []),
+      ...(body.file ? (Array.isArray(body.file) ? body.file : [body.file]) : [])
+    ];
+
+    // Deduplicate attachments list by object identity/reference or specific properties
+    const seen = new Set();
+    const attachmentsList = [];
+    for (const attach of rawAttachments) {
+      if (!attach) continue;
+      const key = attach.name || attach.filename || attach.fileName || attach.url || attach.data || attach.base64Data || Math.random().toString();
+      if (!seen.has(key)) {
+        seen.add(key);
+        attachmentsList.push(attach);
+      }
+    }
+
+    console.log(`[Incoming Email API] Processing ${attachmentsList.length} attachments.`);
 
     for (const attach of attachmentsList) {
-      const { name, url, fileSize, fileType } = attach;
+      if (!attach) continue;
+
+      // Support alternate property names (n8n commonly maps to filename, contentType, size, etc.)
+      const rawName = attach.name || attach.filename || attach.fileName || '';
+      const url = attach.url || '';
+      const fileSize = attach.fileSize ?? attach.size ?? 1024;
+      const fileType = attach.fileType || attach.mimeType || attach.contentType || '';
       const data = attach.data || attach.base64Data || attach.fileData || attach.content;
 
       // Safe parsing of fileSize to integer
@@ -231,6 +260,27 @@ export async function POST(req: Request) {
             parsedSize = Math.round(num);
           }
         }
+      }
+
+      // Deduce extension from MIME type / contentType if name has no extension
+      let deducedExt = '';
+      if (fileType) {
+        const typeLower = fileType.toLowerCase();
+        if (typeLower.includes('pdf')) deducedExt = 'pdf';
+        else if (typeLower.includes('png')) deducedExt = 'png';
+        else if (typeLower.includes('jpeg') || typeLower.includes('jpg')) deducedExt = 'jpeg';
+        else if (typeLower.includes('webp')) deducedExt = 'webp';
+        else if (typeLower.includes('gif')) deducedExt = 'gif';
+        else if (typeLower.includes('heic')) deducedExt = 'heic';
+        else if (typeLower.includes('word') || typeLower.includes('officedocument.wordprocessingml')) deducedExt = 'docx';
+        else if (typeLower.includes('text') || typeLower.includes('plain')) deducedExt = 'txt';
+      }
+
+      let name = rawName.trim();
+      if (!name) {
+        name = deducedExt ? `attachment.${deducedExt}` : 'attachment.pdf';
+      } else if (!name.includes('.') && deducedExt) {
+        name = `${name}.${deducedExt}`;
       }
 
       // Classify the document category using OpenAI
@@ -259,8 +309,8 @@ export async function POST(req: Request) {
       let finalBase64 = fileDataBase64;
 
       const attachmentExtension = name.split('.').pop()?.toLowerCase() || '';
-      const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(attachmentExtension) ||
-                      /\.(png|jpe?g|webp|gif)$/i.test(name || '');
+      const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif'].includes(attachmentExtension) ||
+                      /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(name || '');
 
       if (isImage) {
         convertedFileType = attachmentExtension.toUpperCase();
@@ -334,6 +384,18 @@ export async function POST(req: Request) {
           }
         } else if (isImage && process.env.OPENAI_API_KEY) {
           try {
+            let openAiMimeType = 'image/png';
+            const extLower = fileExt.toLowerCase();
+            if (extLower === 'jpg' || extLower === 'jpeg') {
+              openAiMimeType = 'image/jpeg';
+            } else if (extLower === 'webp') {
+              openAiMimeType = 'image/webp';
+            } else if (extLower === 'gif') {
+              openAiMimeType = 'image/gif';
+            } else if (extLower === 'heic' || extLower === 'heif') {
+              openAiMimeType = 'image/heic';
+            }
+
             const response = await openai.chat.completions.create({
               model: 'gpt-4o-mini',
               messages: [
@@ -344,7 +406,7 @@ export async function POST(req: Request) {
                     {
                       type: 'image_url',
                       image_url: {
-                        url: `data:image/${fileExt || 'png'};base64,${finalBase64}`
+                        url: `data:${openAiMimeType};base64,${finalBase64}`
                       }
                     }
                   ]
