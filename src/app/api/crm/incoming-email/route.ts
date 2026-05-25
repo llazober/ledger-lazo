@@ -309,6 +309,43 @@ export async function POST(req: Request) {
           } catch (pdfErr: any) {
             console.error("PDF parse failed:", pdfErr);
           }
+
+          // If PDF text layer is nearly empty, it's a scanned PDF — fall back to Vision OCR
+          const cleanPdfText = extractedText.replace(/[\s\-\d]/g, '');
+          if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY) {
+            console.log('[Email Route] Scanned PDF detected — falling back to Vision OCR...');
+            try {
+              const visionResponse = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      {
+                        type: 'text',
+                        text: 'This is a scanned tax document. Transcribe ALL visible text precisely — including box numbers, labels, monetary values, TINs, SSNs, EINs, employer names, addresses, and any form type identifiers (e.g. W-2, 1099-NEC, 1099-MISC). Preserve layout context where possible so that box numbers and their values are clearly associated.'
+                      },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: `data:application/pdf;base64,${finalBase64}`
+                        }
+                      }
+                    ]
+                  }
+                ]
+              });
+              const visionText = visionResponse.choices[0].message?.content || '';
+              if (visionText && visionText.trim().length > 50) {
+                extractedText = visionText;
+                console.log('[Email Route] Vision OCR succeeded. Extracted text length:', visionText.length);
+              } else {
+                console.warn('[Email Route] Vision OCR returned minimal text for scanned PDF.');
+              }
+            } catch (visionFallbackErr) {
+              console.error('[Email Route] Vision OCR fallback failed:', visionFallbackErr);
+            }
+          }
         } else if (isImage && process.env.OPENAI_API_KEY) {
           try {
             const response = await openai.chat.completions.create({

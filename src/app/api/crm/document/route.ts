@@ -112,9 +112,43 @@ export async function POST(req: Request) {
         const cleanText = rawText.replace(/[\s\-\d]/g, '');
         const isLikelyScannedPdf = isPdf && cleanText.length < 50;
 
-        if (isLikelyScannedPdf) {
-          aiSummary = "Scanned document detected. Standard text layer is empty. Please upload as a PNG/JPG image file for full OCR transcription.";
-          validationErrors = "Scanned document detected. Standard text layer is empty. Check manually or upload as PNG/JPG image.";
+        if (isLikelyScannedPdf && process.env.OPENAI_API_KEY) {
+          console.log('[Document Route] Scanned PDF detected — falling back to Vision OCR...');
+          try {
+            // Send the raw PDF base64 to GPT-4o Vision for full OCR
+            const visionResponse = await openai.chat.completions.create({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'This is a scanned tax document. Transcribe ALL visible text precisely — including box numbers, labels, monetary values, TINs, SSNs, EINs, employer names, addresses, and any form type identifiers (e.g. W-2, 1099-NEC, 1099-MISC). Preserve layout context where possible so that box numbers and their values are clearly associated.'
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:application/pdf;base64,${fileData}`
+                      }
+                    }
+                  ]
+                }
+              ]
+            });
+            const visionText = visionResponse.choices[0].message?.content || '';
+            if (visionText && visionText.trim().length > 50) {
+              rawText = visionText;
+              extractedText = visionText;
+              console.log('[Document Route] Vision OCR succeeded. Extracted text length:', visionText.length);
+            } else {
+              console.warn('[Document Route] Vision OCR returned minimal text. PDF may be unreadable.');
+              validationErrors = 'Scanned document could not be parsed. Try uploading as PNG/JPG image.';
+            }
+          } catch (visionFallbackErr) {
+            console.error('[Document Route] Vision OCR fallback failed:', visionFallbackErr);
+            validationErrors = 'Scanned document detected. Standard text layer is empty. Upload as PNG/JPG for full OCR.';
+          }
         }
 
         const hasOpenAI = process.env.OPENAI_API_KEY && 
