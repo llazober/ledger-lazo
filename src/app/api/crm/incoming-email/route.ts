@@ -208,6 +208,22 @@ export async function POST(req: Request) {
 
     // 2. Process attachments and perform AI classification
     const createdDocuments = [];
+
+    console.log("[Incoming Email API] Request received:", {
+      fromEmail,
+      fromName,
+      subject,
+      bodyKeys: Object.keys(body),
+      attachmentsPresent: !!attachments,
+      attachmentsType: typeof attachments,
+      attachmentsLength: Array.isArray(attachments) ? attachments.length : null,
+      bodyAttachmentsPresent: !!body.attachments,
+      bodyAttachmentsType: typeof body.attachments,
+      bodyAttachmentsLength: Array.isArray(body.attachments) ? body.attachments.length : null,
+      inlineAttachmentsPresent: !!body.inlineAttachments,
+      inlineAttachmentsType: typeof body.inlineAttachments,
+      inlineAttachmentsLength: Array.isArray(body.inlineAttachments) ? body.inlineAttachments.length : null,
+    });
     
     // Support standard attachments, inline attachments, and potential arrays sent by n8n or mail parsers
     const rawAttachments = [
