@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+.git
+.gitignore
+scratch
+.gemini
+*.log
+*.png
+*.pdf
+*.jpg
+*.jpeg
