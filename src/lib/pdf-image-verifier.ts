@@ -32,21 +32,21 @@ export function compareFields(formType: string, pdfBoxes: Record<string, any>, i
   let keysToCompare: string[] = [];
 
   if (formLower.includes('w2') || formLower.includes('w-2')) {
-    keysToCompare = ['wages', 'fedIncomeTax', 'employeeSsn'];
+    keysToCompare = ['employeeSsn', 'employerEin', 'wages', 'fedIncomeTax', 'socialSecurityWages', 'socialSecurityTax', 'medicareWages', 'medicareTax'];
   } else if (formLower.includes('1099-nec')) {
-    keysToCompare = ['nonemployeeCompensation', 'fedIncomeTax', 'recipientSsn'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'nonemployeeCompensation', 'fedIncomeTax'];
   } else if (formLower.includes('1099-misc')) {
-    keysToCompare = ['rents', 'otherIncome', 'fedIncomeTax', 'recipientSsn'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'rents', 'royalties', 'otherIncome', 'fedIncomeTax', 'substitutePayments'];
   } else if (formLower.includes('1099-int')) {
-    keysToCompare = ['interestIncome', 'fedIncomeTax', 'recipientSsn'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'interestIncome', 'fedIncomeTax'];
   } else if (formLower.includes('1099-div')) {
-    keysToCompare = ['totalOrdinaryDividends', 'fedIncomeTax', 'recipientSsn'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'totalOrdinaryDividends', 'qualifiedDividends', 'totalCapitalGainDist', 'fedIncomeTax'];
   } else if (formLower.includes('1099-r')) {
-    keysToCompare = ['grossDistribution', 'taxableAmount', 'fedIncomeTax', 'distributionCode', 'recipientSsn'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'grossDistribution', 'taxableAmount', 'fedIncomeTax', 'distributionCode', 'otherIncome', 'stateIncomeTax', 'stateDistribution'];
   } else if (formLower.includes('1095-a') || formLower.includes('1095a')) {
-    keysToCompare = ['policyNumber', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc', 'recipientSsn'];
+    keysToCompare = ['marketplaceIdentifier', 'policyNumber', 'recipientName', 'recipientSsn', 'spouseSsn', 'policyStartDate', 'policyTerminationDate', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc'];
   } else if (formLower.includes('1099-ssa') || formLower.includes('ssa-1099')) {
-    keysToCompare = ['benefitsPaid', 'netBenefits', 'fedIncomeTax', 'recipientSsn'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'benefitsPaid', 'fedIncomeTax', 'netBenefits'];
   } else {
     // Other forms or generic 1099 forms: compare overlapping keys
     const pdfKeys = Object.keys(pdfBoxes);
