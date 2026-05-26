@@ -217,6 +217,7 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
       canvasContext: context as any,
       viewport: viewport,
       canvas: canvas as any,
+      renderInteractiveForms: true,
     }).promise;
 
     const pngBuffer = canvas.toBuffer('image/png');
