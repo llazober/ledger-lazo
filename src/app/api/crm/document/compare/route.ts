@@ -153,7 +153,7 @@ export async function POST(req: Request) {
     } else if (formLower.includes('1099-div')) {
       keysToCompare = ['totalOrdinaryDividends', 'fedIncomeTax', 'recipientSsn'];
     } else if (formLower.includes('1099-r')) {
-      keysToCompare = ['grossDistribution', 'taxableAmount', 'fedIncomeTax', 'recipientSsn'];
+      keysToCompare = ['grossDistribution', 'taxableAmount', 'fedIncomeTax', 'distributionCode', 'recipientSsn'];
     } else if (formLower.includes('1095-a') || formLower.includes('1095a')) {
       keysToCompare = ['policyNumber', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc', 'recipientSsn'];
     } else if (formLower.includes('1099-ssa') || formLower.includes('ssa-1099')) {
