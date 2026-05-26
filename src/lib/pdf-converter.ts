@@ -11,36 +11,61 @@ import { pathToFileURL } from 'url';
  * @param maxPages The maximum number of pages to convert (default is 3 to save token/API costs).
  * @returns Array of base64-encoded PNG images.
  */
-function getCategoryKeywords(category: string): string[] {
+function scorePageForCategory(pageText: string, category: string): number {
   const cat = category.toLowerCase();
+  let score = 0;
+
+  // Helper helper to check matches
+  const has = (terms: string[]) => terms.some(term => pageText.includes(term));
+  const count = (terms: string[]) => terms.filter(term => pageText.includes(term)).length;
+
   if (cat === 'w2' || cat === 'w-2') {
-    return ['w-2', 'w2', 'wage and tax statement', 'wages, tips', 'social security wages'];
+    if (has(['form w-2', 'form w2', 'form w - 2'])) score += 12;
+    score += count(['wages, tips, other compensation', 'wages, tips', 'social security wages', 'medicare wages and tips', 'medicare wages', 'social security tax withheld', 'federal income tax withheld']) * 5;
+    score += count(['copy b', 'copy c', 'copy 1', 'copy d', 'copy b ', 'copy c ', 'copy d ']) * 3;
+    score += count(['department of the treasury', 'internal revenue service']) * 2;
   }
-  if (cat === '1099-nec') {
-    return ['1099-nec', '1099nec', 'nonemployee compensation'];
+  else if (cat === '1099-nec') {
+    if (has(['form 1099-nec', 'form 1099nec', 'form 1099 nec'])) score += 12;
+    score += count(['nonemployee compensation', 'federal income tax withheld']) * 8;
+    score += count(["payer's federal identification number", "payer's tin", "recipient's identification number", "recipient's tin"]) * 4;
+    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
   }
-  if (cat === '1099-misc') {
-    return ['1099-misc', '1099misc', 'rents', 'royalties', 'other income'];
+  else if (cat === '1099-misc') {
+    if (has(['form 1099-misc', 'form 1099misc', 'form 1099 misc'])) score += 12;
+    score += count(['rents', 'royalties', 'other income', 'federal income tax withheld', 'substitute payments']) * 5;
+    score += count(["payer's federal identification number", "payer's tin", "recipient's identification number", "recipient's tin"]) * 4;
+    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
   }
-  if (cat === '1099-int') {
-    return ['1099-int', '1099int', 'interest income'];
+  else if (cat === '1099-int') {
+    if (has(['form 1099-int', 'form 1099int', 'form 1099 int'])) score += 12;
+    score += count(['interest income', 'early withdrawal penalty', 'federal income tax withheld']) * 6;
+    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
   }
-  if (cat === '1099-div') {
-    return ['1099-div', '1099div', 'dividends and distributions'];
+  else if (cat === '1099-div') {
+    if (has(['form 1099-div', 'form 1099div', 'form 1099 div'])) score += 12;
+    score += count(['total ordinary dividends', 'qualified dividends', 'total capital gain dist', 'capital gain', 'federal income tax withheld']) * 6;
+    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
   }
-  if (cat === '1099-r') {
-    return ['1099-r', '1099r', 'distributions from pensions', 'retirement', 'gross distribution'];
+  else if (cat === '1099-r') {
+    if (has(['form 1099-r', 'form 1099r', 'form 1099 r'])) score += 12;
+    score += count(['gross distribution', 'taxable amount', 'distribution code', 'distribution code(s)', 'federal income tax withheld']) * 6;
+    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
   }
-  if (cat === '1095-a' || cat === '1095a') {
-    return ['1095-a', '1095a', 'health insurance marketplace statement'];
+  else if (cat === '1095-a' || cat === '1095a') {
+    if (has(['form 1095-a', 'form 1095a', 'form 1095 a'])) score += 12;
+    score += count(['health insurance marketplace statement', 'marketplace identifier', 'policy number', 'monthly enrollment premiums', 'annual enrollment premiums', 'monthly advance payment of premium tax credit', 'annual advance ptc']) * 6;
   }
-  if (cat === '1099-ssa' || cat === 'ssa-1099' || cat === 'ssa1099') {
-    return ['ssa-1099', 'ssa1099', 'social security benefit statement'];
+  else if (cat === '1099-ssa' || cat === 'ssa-1099' || cat === 'ssa1099') {
+    if (has(['ssa-1099', 'form ssa-1099', 'ssa1099'])) score += 12;
+    score += count(['social security benefit statement', 'benefits paid', 'net benefits', 'net social security benefits', 'federal income tax withheld']) * 6;
   }
-  if (cat === '1098') {
-    return ['1098', 'mortgage interest statement'];
+  else if (cat === '1098') {
+    if (has(['form 1098', 'form 1098', 'form 1098'])) score += 12;
+    score += count(['mortgage interest statement', 'mortgage interest received', 'outstanding mortgage principal', 'outstanding principal', 'mortgage origination date', 'origination date', 'refund of overpaid interest', 'interest refund', 'mortgage insurance premiums', 'points paid', 'real estate taxes']) * 6;
   }
-  return [];
+
+  return score;
 }
 
 /**
@@ -75,28 +100,31 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
   const imagesBase64: string[] = [];
 
   let pageToRender = 1;
-  let found = false;
+  let highestScore = 0;
 
   if (category) {
-    const keywords = getCategoryKeywords(category);
-    if (keywords.length > 0) {
-      for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-        try {
-          const page = await pdfDocument.getPage(pageNum);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
+    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+      try {
+        const page = await pdfDocument.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
 
-          const hasKeyword = keywords.some(kw => pageText.includes(kw));
-          if (hasKeyword) {
-            pageToRender = pageNum;
-            found = true;
-            console.log(`[PDF Converter] Identified target form category "${category}" on page ${pageNum}`);
-            break;
-          }
-        } catch (err) {
-          console.error(`[PDF Converter] Failed to scan text for page ${pageNum}:`, err);
+        const score = scorePageForCategory(pageText, category);
+        console.log(`[PDF Converter] Page ${pageNum} scored ${score} for category "${category}"`);
+
+        if (score > highestScore) {
+          highestScore = score;
+          pageToRender = pageNum;
         }
+      } catch (err) {
+        console.error(`[PDF Converter] Failed to scan text for page ${pageNum}:`, err);
       }
+    }
+    
+    if (highestScore > 0) {
+      console.log(`[PDF Converter] Selected Page ${pageToRender} (score: ${highestScore}) for category "${category}"`);
+    } else {
+      console.log(`[PDF Converter] No form pages matched for category "${category}". Defaulting to page 1.`);
     }
   }
 
