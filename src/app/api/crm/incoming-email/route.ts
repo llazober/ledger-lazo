@@ -443,19 +443,76 @@ export async function POST(req: Request) {
         }
       });
 
+      // Re-classify the document category if initial classification is vague or unclassified using extracted OCR text
+      if (extractedText && (doc.category === 'UNCLASSIFIED' || doc.category === '1099' || doc.category === '1099-UNCLASSIFIED')) {
+        try {
+          console.log(`[Email Route] Vague initial category (${doc.category}). Re-classifying based on OCR text...`);
+          
+          const prompt = `You are an expert CPA Tax Assistant.
+Analyze the following raw OCR text extracted from an uploaded client document:
+---
+${extractedText}
+---
+
+Your task:
+1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2026, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+4. Estimate your parsing confidence score between 0.0 and 1.0.
+5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+
+Format your output as a JSON object with keys:
+"category", "aiSummary", "confidenceScore", "validationErrors"`;
+
+          const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: "json_object" }
+          });
+
+          const result = JSON.parse(response.choices[0].message?.content || '{}');
+          
+          if (result.category && result.category !== 'UNCLASSIFIED') {
+            console.log(`[Email Route] Re-classified document ${doc.id} from ${doc.category} to ${result.category}`);
+            const newStatus = (result.validationErrors || result.category === 'UNCLASSIFIED' || result.category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+            
+            const updated = await prisma.document.update({
+              where: { id: doc.id },
+              data: {
+                category: result.category,
+                aiSummary: result.aiSummary || doc.aiSummary,
+                confidenceScore: result.confidenceScore || doc.confidenceScore,
+                validationErrors: result.validationErrors,
+                status: newStatus
+              }
+            });
+            doc.category = updated.category;
+            doc.status = updated.status;
+            doc.aiSummary = updated.aiSummary;
+            doc.confidenceScore = updated.confidenceScore;
+            doc.validationErrors = updated.validationErrors;
+          }
+        } catch (reclassErr) {
+          console.error("[Email Route] Re-classification of raw text failed:", reclassErr);
+        }
+      }
+
       let finalDoc = doc;
 
-      // Convert PDF page 1 to a companion PNG image document for manual review (independent of text extraction status)
+      // Convert PDF pages to companion PNG image documents for manual review (independent of text extraction status)
       const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
       if (isPdf && finalBase64) {
         try {
           console.log(`[Email Route] Converting PDF attachment ${name} to PNG for manual verification...`);
           const { convertPdfToImages } = await import('@/lib/pdf-converter');
           const fileBuffer = Buffer.from(finalBase64, 'base64');
-          const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
-          if (pagesBase64 && pagesBase64.length > 0) {
-            const imageBase64 = pagesBase64[0];
-            const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+          // Convert up to 4 pages of the PDF to companion images
+          const pagesBase64 = await convertPdfToImages(fileBuffer, 4);
+          for (let i = 0; i < pagesBase64.length; i++) {
+            const imageBase64 = pagesBase64[i];
+            const imageName = pagesBase64.length === 1
+              ? `${name.replace(/\.pdf$/i, '')} (Image Verification).png`
+              : `${name.replace(/\.pdf$/i, '')} (Image Verification - Page ${i + 1}).png`;
             
             await prisma.document.create({
               data: {

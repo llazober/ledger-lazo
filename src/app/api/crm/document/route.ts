@@ -202,17 +202,19 @@ Format your output as a JSON object with keys:
 
     let finalDocument = document;
 
-    // Convert PDF page 1 to a companion PNG image document for manual review (independent of text extraction status)
+    // Convert PDF pages to companion PNG image documents for manual review (independent of text extraction status)
     const isPdf = fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf');
     if (isPdf && fileData) {
       try {
         console.log(`[Document Route] Converting PDF ${name} to PNG for manual verification...`);
         const { convertPdfToImages } = await import('@/lib/pdf-converter');
         const fileBuffer = Buffer.from(fileData, 'base64');
-        const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
-        if (pagesBase64 && pagesBase64.length > 0) {
-          const imageBase64 = pagesBase64[0];
-          const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+        const pagesBase64 = await convertPdfToImages(fileBuffer, 4);
+        for (let i = 0; i < pagesBase64.length; i++) {
+          const imageBase64 = pagesBase64[i];
+          const imageName = pagesBase64.length === 1
+            ? `${name.replace(/\.pdf$/i, '')} (Image Verification).png`
+            : `${name.replace(/\.pdf$/i, '')} (Image Verification - Page ${i + 1}).png`;
           
           await prisma.document.create({
             data: {
