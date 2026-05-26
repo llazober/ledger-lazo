@@ -31,7 +31,8 @@ Filename: "${filename}"
 Email Subject: "${subject}"
 Email Body: "${bodyText}"
 
-Classify it into one of these exact categories: "W2", "1099-NEC", "1099", "1099-INT", "1099-DIV", "1099-R", "1099-MISC", "1099-B", "SSA-1099", "1095-A", "Bank_Statement", "Receipt", "Tax_Notice", "Ledger", "Balance_Sheet", "UNCLASSIFIED".
+Classify it into one of these exact categories: "W2", "1099-NEC", "1099", "1099-INT", "1099-DIV", "1099-R", "1099-MISC", "1099-B", "SSA-1099", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "Ledger", "Balance_Sheet", "UNCLASSIFIED".
+    Note: "1098" is specifically for Mortgage Interest Statements. "1099-INT" is only for Interest Income. "SSA-1099" is for Social Security benefits.
 
 Also, generate a 1-sentence summary of the document based on its name/context.
 Provide a confidence score between 0.0 and 1.0.
@@ -447,10 +448,10 @@ export async function POST(req: Request) {
         }
       });
 
-      // Re-classify the document category if initial classification is vague or unclassified using extracted OCR text
-      if (extractedText && (doc.category === 'UNCLASSIFIED' || doc.category === '1099' || doc.category === '1099-UNCLASSIFIED')) {
+      // Re-classify the document category if initial classification is vague or to confirm tax form category using extracted OCR text
+      if (extractedText && (doc.category === 'UNCLASSIFIED' || doc.category.startsWith('1099') || doc.category === 'W2' || doc.category === '1098' || doc.category === '1095-A')) {
         try {
-          console.log(`[Email Route] Vague initial category (${doc.category}). Re-classifying based on OCR text...`);
+          console.log(`[Email Route] Confirming/refining initial category (${doc.category}) based on OCR text...`);
           
           const prompt = `You are an expert CPA Tax Assistant.
 Analyze the following raw OCR text extracted from an uploaded client document:

@@ -246,7 +246,7 @@ ${visionText}
 ---
 
 Your task:
-1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
 2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
 3. Check for any validation errors or discrepancies. Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
