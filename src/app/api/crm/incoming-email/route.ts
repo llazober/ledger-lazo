@@ -430,6 +430,25 @@ export async function POST(req: Request) {
       // Clean up extractedText whitespace
       extractedText = extractedText.trim();
 
+      // Clear all spaces/hyphens and check for unique OMB control numbers
+      const cleanTextForOMB = extractedText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
+      let detectedCategory: string | null = null;
+      if (cleanTextForOMB.includes('15451380')) detectedCategory = '1098';
+      else if (cleanTextForOMB.includes('15450008')) detectedCategory = 'W2';
+      else if (cleanTextForOMB.includes('15450112')) detectedCategory = '1099-INT';
+      else if (cleanTextForOMB.includes('15450110')) detectedCategory = '1099-DIV';
+      else if (cleanTextForOMB.includes('15450119')) detectedCategory = '1099-R';
+      else if (cleanTextForOMB.includes('15452232')) detectedCategory = '1095-A';
+      else if (cleanTextForOMB.includes('09600616')) detectedCategory = '1099-SSA';
+      else if (cleanTextForOMB.includes('15450115')) {
+        detectedCategory = cleanTextForOMB.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
+      }
+
+      if (detectedCategory) {
+        console.log(`[Email Route] OMB fingerprint matched: ${detectedCategory}. Overriding category.`);
+        aiResult.category = detectedCategory;
+      }
+
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,

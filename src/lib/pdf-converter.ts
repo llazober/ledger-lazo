@@ -117,7 +117,67 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
   let pageToRender = 1;
   let highestScore = 0;
 
-  if (category) {
+  // 1. Scan all pages for OMB numbers first to find a guaranteed match
+  let detectedPage = -1;
+  let detectedCategory = "";
+  
+  for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+    try {
+      const page = await pdfDocument.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
+      const clean = pageText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
+
+      // Check unique OMB control number fingerprints
+      if (clean.includes('15451380')) {
+        detectedPage = pageNum;
+        detectedCategory = '1098';
+        break;
+      }
+      if (clean.includes('15450008')) {
+        detectedPage = pageNum;
+        detectedCategory = 'W2';
+        break;
+      }
+      if (clean.includes('15450112')) {
+        detectedPage = pageNum;
+        detectedCategory = '1099-INT';
+        break;
+      }
+      if (clean.includes('15450110')) {
+        detectedPage = pageNum;
+        detectedCategory = '1099-DIV';
+        break;
+      }
+      if (clean.includes('15450119')) {
+        detectedPage = pageNum;
+        detectedCategory = '1099-R';
+        break;
+      }
+      if (clean.includes('15452232')) {
+        detectedPage = pageNum;
+        detectedCategory = '1095-A';
+        break;
+      }
+      if (clean.includes('09600616')) {
+        detectedPage = pageNum;
+        detectedCategory = '1099-SSA';
+        break;
+      }
+      if (clean.includes('15450115')) {
+        detectedPage = pageNum;
+        detectedCategory = clean.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
+        break;
+      }
+    } catch (e) {
+      // Ignored
+    }
+  }
+
+  if (detectedPage !== -1) {
+    console.log(`[PDF Converter] 100% matched Form OMB fingerprint on page ${detectedPage} -> category "${detectedCategory}"`);
+    pageToRender = detectedPage;
+  } else if (category) {
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       try {
         const page = await pdfDocument.getPage(pageNum);
