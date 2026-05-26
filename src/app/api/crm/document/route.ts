@@ -202,6 +202,38 @@ Format your output as a JSON object with keys:
 
     let finalDocument = document;
 
+    // Convert PDF page 1 to a companion PNG image document for manual review (independent of text extraction status)
+    const isPdf = fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+    if (isPdf && fileData) {
+      try {
+        console.log(`[Document Route] Converting PDF ${name} to PNG for manual verification...`);
+        const { convertPdfToImages } = await import('@/lib/pdf-converter');
+        const fileBuffer = Buffer.from(fileData, 'base64');
+        const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
+        if (pagesBase64 && pagesBase64.length > 0) {
+          const imageBase64 = pagesBase64[0];
+          const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+          
+          await prisma.document.create({
+            data: {
+              clientId: document.clientId,
+              name: imageName,
+              url: '#',
+              fileSize: Math.round(imageBase64.length * 0.75),
+              fileType: 'PNG',
+              taxYear: document.taxYear,
+              category: 'UNCLASSIFIED',
+              status: 'UPLOADED',
+              fileData: imageBase64,
+            }
+          });
+          console.log(`[Document Route] Successfully created companion PNG: ${imageName}`);
+        }
+      } catch (imgErr) {
+        console.error("Failed to generate companion PNG on upload:", imgErr);
+      }
+    }
+
     // Generate RAG chunks and embeddings
     if (extractedText) {
       try {
@@ -216,38 +248,6 @@ Format your output as a JSON object with keys:
           await extractAndSaveTaxFormData(document.id, document.category, extractedText);
         } catch (tfErr) {
           console.error("Failed to extract tax form data on create:", tfErr);
-        }
-      }
-
-      // Convert PDF page 1 to a companion PNG image document for manual review
-      const isPdf = fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-      if (isPdf && fileData) {
-        try {
-          console.log(`[Document Route] Converting PDF ${name} to PNG for manual verification...`);
-          const { convertPdfToImages } = await import('@/lib/pdf-converter');
-          const fileBuffer = Buffer.from(fileData, 'base64');
-          const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
-          if (pagesBase64 && pagesBase64.length > 0) {
-            const imageBase64 = pagesBase64[0];
-            const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
-            
-            await prisma.document.create({
-              data: {
-                clientId: document.clientId,
-                name: imageName,
-                url: '#',
-                fileSize: Math.round(imageBase64.length * 0.75),
-                fileType: 'PNG',
-                taxYear: document.taxYear,
-                category: 'UNCLASSIFIED',
-                status: 'UPLOADED',
-                fileData: imageBase64,
-              }
-            });
-            console.log(`[Document Route] Successfully created companion PNG: ${imageName}`);
-          }
-        } catch (imgErr) {
-          console.error("Failed to generate companion PNG on upload:", imgErr);
         }
       }
     }

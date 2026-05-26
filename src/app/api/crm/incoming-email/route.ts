@@ -445,6 +445,38 @@ export async function POST(req: Request) {
 
       let finalDoc = doc;
 
+      // Convert PDF page 1 to a companion PNG image document for manual review (independent of text extraction status)
+      const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+      if (isPdf && finalBase64) {
+        try {
+          console.log(`[Email Route] Converting PDF attachment ${name} to PNG for manual verification...`);
+          const { convertPdfToImages } = await import('@/lib/pdf-converter');
+          const fileBuffer = Buffer.from(finalBase64, 'base64');
+          const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
+          if (pagesBase64 && pagesBase64.length > 0) {
+            const imageBase64 = pagesBase64[0];
+            const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+            
+            await prisma.document.create({
+              data: {
+                clientId: doc.clientId,
+                name: imageName,
+                url: '#',
+                fileSize: Math.round(imageBase64.length * 0.75),
+                fileType: 'PNG',
+                taxYear: doc.taxYear,
+                category: 'UNCLASSIFIED',
+                status: 'UPLOADED',
+                fileData: imageBase64,
+              }
+            });
+            console.log(`[Email Route] Successfully created companion PNG: ${imageName}`);
+          }
+        } catch (imgErr) {
+          console.error("Failed to generate companion PNG for email attachment:", imgErr);
+        }
+      }
+
       // Generate RAG chunks and embeddings so it is indexed for search
       if (extractedText) {
         try {
@@ -459,38 +491,6 @@ export async function POST(req: Request) {
             await extractAndSaveTaxFormData(doc.id, doc.category, extractedText);
           } catch (tfErr) {
             console.error("Failed to extract tax form data for email attachment:", tfErr);
-          }
-        }
-
-        // Convert PDF page 1 to a companion PNG image document for manual review
-        const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-        if (isPdf && finalBase64) {
-          try {
-            console.log(`[Email Route] Converting PDF attachment ${name} to PNG for manual verification...`);
-            const { convertPdfToImages } = await import('@/lib/pdf-converter');
-            const fileBuffer = Buffer.from(finalBase64, 'base64');
-            const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
-            if (pagesBase64 && pagesBase64.length > 0) {
-              const imageBase64 = pagesBase64[0];
-              const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
-              
-              await prisma.document.create({
-                data: {
-                  clientId: doc.clientId,
-                  name: imageName,
-                  url: '#',
-                  fileSize: Math.round(imageBase64.length * 0.75),
-                  fileType: 'PNG',
-                  taxYear: doc.taxYear,
-                  category: 'UNCLASSIFIED',
-                  status: 'UPLOADED',
-                  fileData: imageBase64,
-                }
-              });
-              console.log(`[Email Route] Successfully created companion PNG: ${imageName}`);
-            }
-          } catch (imgErr) {
-            console.error("Failed to generate companion PNG for email attachment:", imgErr);
           }
         }
       }
