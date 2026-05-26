@@ -86,12 +86,28 @@ CRITICAL RULES:
       
       const resultText = response.choices[0].message?.content || '';
       console.log(`[OpenAI OCR] GPT-4o image vision transcription completed. Length: ${resultText.length}`);
+
+      const lowerText = resultText.toLowerCase();
+      const isRefusal = 
+        (lowerText.includes("sorry") && (lowerText.includes("can't") || lowerText.includes("cannot") || lowerText.includes("unable"))) ||
+        lowerText.includes("cannot assist") ||
+        lowerText.includes("unable to assist") ||
+        lowerText.includes("cannot process") ||
+        lowerText.includes("identifying or processing") ||
+        lowerText.includes("identify or process") ||
+        lowerText.includes("specific documents") ||
+        lowerText.includes("safety policy");
+
+      if (isRefusal) {
+        throw new Error(`OpenAI Vision Refusal detected: ${resultText.trim()}`);
+      }
+
       if (resultText.trim().length > 10) {
         return '[OCR_METHOD: CANVAS]\n' + resultText;
       }
     }
   } catch (err: any) {
-    console.warn(`[OpenAI OCR] Rendering pages to PNG failed, falling back to Files API upload. Error:`, err.message);
+    console.warn(`[OpenAI OCR] Vision transcription failed or was refused, falling back to Files API upload. Error:`, err.message);
   }
 
   // 2. Second attempt: Fallback to uploading PDF to Files API
