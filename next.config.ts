@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   experimental: {
     webpackBuildWorker: false,
     webpackMemoryOptimizations: true,
+    workerThreads: false,
+    cpus: 1,
   },
 };
 
