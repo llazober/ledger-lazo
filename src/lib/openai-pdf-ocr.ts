@@ -89,14 +89,13 @@ CRITICAL RULES:
 
       const lowerText = resultText.toLowerCase();
       const isRefusal = 
-        (lowerText.includes("sorry") && (lowerText.includes("can't") || lowerText.includes("cannot") || lowerText.includes("unable"))) ||
-        lowerText.includes("cannot assist") ||
-        lowerText.includes("unable to assist") ||
-        lowerText.includes("cannot process") ||
-        lowerText.includes("identifying or processing") ||
-        lowerText.includes("identify or process") ||
-        lowerText.includes("specific documents") ||
-        lowerText.includes("safety policy");
+        lowerText.includes("sorry") ||
+        lowerText.includes("unable to") ||
+        lowerText.includes("can't") ||
+        lowerText.includes("cannot") ||
+        lowerText.includes("not able to") ||
+        lowerText.includes("policy") ||
+        lowerText.includes("as an ai");
 
       if (isRefusal) {
         throw new Error(`OpenAI Vision Refusal detected: ${resultText.trim()}`);
