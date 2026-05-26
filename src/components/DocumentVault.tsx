@@ -323,6 +323,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const [editedText, setEditedText] = useState('');
   const [isSavingEdits, setIsSavingEdits] = useState(false);
   const [isReprocessing, setIsReprocessing] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
 
   useEffect(() => {
     if (activeDoc) {
@@ -426,6 +427,56 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       alert(`OCR Reprocessing failed: ${err.message}`);
     } finally {
       setIsReprocessing(false);
+    }
+  };
+
+  const handleComparePdfPng = async () => {
+    if (!activeDoc) return;
+    setIsComparing(true);
+    try {
+      const res = await fetch('/accounting/api/crm/document/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: activeDoc.id
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Comparison failed");
+      }
+
+      const data = await res.json();
+
+      if (data.success && data.document) {
+        // Update local state list
+        setDocs(prev => prev.map(d => d.id === activeDoc.id ? {
+          ...d,
+          status: data.document.status,
+          validationErrors: data.document.validationErrors,
+          taxFormData: data.document.taxFormData
+        } : d));
+
+        // Update active document state
+        setActiveDoc(prev => prev && prev.id === activeDoc.id ? {
+          ...prev,
+          status: data.document.status,
+          validationErrors: data.document.validationErrors,
+          taxFormData: data.document.taxFormData
+        } : prev);
+
+        if (data.hadDiscrepancies) {
+          alert(`Discrepancies detected and resolved!\n\nMismatched fields updated from PNG: ${data.mismatches.join(', ')}.\nDocument is now flag-corrected and verified!`);
+        } else {
+          alert("Success! All fields match perfectly between the PDF and companion PNG.");
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Comparison failed: ${err.message}`);
+    } finally {
+      setIsComparing(false);
     }
   };
 
@@ -1119,6 +1170,25 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                     "🔄 Re-Run Vision OCR Fallback"
                   )}
                 </button>
+                {activeDoc.name.toLowerCase().endsWith('.pdf') && (
+                  <button
+                    onClick={handleComparePdfPng}
+                    disabled={isComparing}
+                    className="w-full text-xs text-emerald-400 hover:text-emerald-300 font-extrabold flex items-center justify-center gap-2 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/30 transition-all hover:scale-[1.01] uppercase tracking-wider disabled:opacity-50"
+                  >
+                    {isComparing ? (
+                      <span className="flex items-center justify-center gap-1.5">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Comparing PDF & PNG...
+                      </span>
+                    ) : (
+                      "🔍 Compare PDF & PNG Data"
+                    )}
+                  </button>
+                )}
               </div>
 
               {activeDoc.aiSummary && (
