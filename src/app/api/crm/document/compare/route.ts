@@ -155,7 +155,7 @@ export async function POST(req: Request) {
     } else if (formLower.includes('1099-r')) {
       keysToCompare = ['grossDistribution', 'taxableAmount', 'fedIncomeTax', 'recipientSsn'];
     } else if (formLower.includes('1095-a') || formLower.includes('1095a')) {
-      keysToCompare = ['policyNumber', 'annualEnrollmentPremiums', 'annualAdvancePtc', 'recipientSsn'];
+      keysToCompare = ['policyNumber', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc', 'recipientSsn'];
     } else if (formLower.includes('1099-ssa') || formLower.includes('ssa-1099')) {
       keysToCompare = ['benefitsPaid', 'netBenefits', 'fedIncomeTax', 'recipientSsn'];
     } else {
