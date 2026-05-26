@@ -13,56 +13,71 @@ import { pathToFileURL } from 'url';
  */
 function scorePageForCategory(pageText: string, category: string): number {
   const cat = category.toLowerCase();
+  
+  // Strip all whitespace and punctuation/dashes to be 100% layout and format-independent
+  const clean = pageText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
+  
   let score = 0;
 
-  // Helper helper to check matches
-  const has = (terms: string[]) => terms.some(term => pageText.includes(term));
-  const count = (terms: string[]) => terms.filter(term => pageText.includes(term)).length;
+  // Helper check
+  const has = (term: string) => clean.includes(term);
+  const count = (terms: string[]) => terms.filter(term => clean.includes(term)).length;
 
   if (cat === 'w2' || cat === 'w-2') {
-    if (has(['form w-2', 'form w2', 'form w - 2'])) score += 12;
-    score += count(['wages, tips, other compensation', 'wages, tips', 'social security wages', 'medicare wages and tips', 'medicare wages', 'social security tax withheld', 'federal income tax withheld']) * 5;
-    score += count(['copy b', 'copy c', 'copy 1', 'copy d', 'copy b ', 'copy c ', 'copy d ']) * 3;
-    score += count(['department of the treasury', 'internal revenue service']) * 2;
+    if (has('formw2')) score += 15;
+    if (has('ombno15450008')) score += 20; // Official W-2 OMB No.
+    score += count(['wagestipsothercompensation', 'wagestips', 'socialsecuritywages', 'medicarewagesandtips', 'medicarewages', 'socialsecuritytaxwithheld', 'federalincometaxwithheld']) * 8;
+    score += count(['copyb', 'copyc', 'copy1', 'copyd']) * 4;
+    score += count(['departmentofthetreasury', 'internalrevenueservice']) * 3;
   }
   else if (cat === '1099-nec') {
-    if (has(['form 1099-nec', 'form 1099nec', 'form 1099 nec'])) score += 12;
-    score += count(['nonemployee compensation', 'federal income tax withheld']) * 8;
-    score += count(["payer's federal identification number", "payer's tin", "recipient's identification number", "recipient's tin"]) * 4;
-    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
+    if (has('form1099nec')) score += 15;
+    if (has('ombno15450115')) score += 20; // NEC/MISC OMB No.
+    score += count(['nonemployeecompensation', 'federalincometaxwithheld']) * 10;
+    score += count(['payerfederalidentificationnumber', 'payerstin', 'recipientidentificationnumber', 'recipientstin']) * 5;
+    score += count(['copyb', 'copyc', 'copya', 'copy1']) * 4;
   }
   else if (cat === '1099-misc') {
-    if (has(['form 1099-misc', 'form 1099misc', 'form 1099 misc'])) score += 12;
-    score += count(['rents', 'royalties', 'other income', 'federal income tax withheld', 'substitute payments']) * 5;
-    score += count(["payer's federal identification number", "payer's tin", "recipient's identification number", "recipient's tin"]) * 4;
-    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
+    if (has('form1099misc')) score += 15;
+    if (has('ombno15450115')) score += 20; // NEC/MISC OMB No.
+    score += count(['rents', 'royalties', 'otherincome', 'federalincometaxwithheld', 'substitutepayments']) * 8;
+    score += count(['payerfederalidentificationnumber', 'payerstin', 'recipientidentificationnumber', 'recipientstin']) * 5;
+    score += count(['copyb', 'copyc', 'copya', 'copy1']) * 4;
   }
   else if (cat === '1099-int') {
-    if (has(['form 1099-int', 'form 1099int', 'form 1099 int'])) score += 12;
-    score += count(['interest income', 'early withdrawal penalty', 'federal income tax withheld']) * 6;
-    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
+    if (has('form1099int')) score += 15;
+    if (has('ombno15450112')) score += 20; // INT OMB No.
+    score += count(['interestincome', 'earlywithdrawalpenalty', 'federalincometaxwithheld']) * 10;
+    score += count(['copyb', 'copyc', 'copya', 'copy1']) * 4;
   }
   else if (cat === '1099-div') {
-    if (has(['form 1099-div', 'form 1099div', 'form 1099 div'])) score += 12;
-    score += count(['total ordinary dividends', 'qualified dividends', 'total capital gain dist', 'capital gain', 'federal income tax withheld']) * 6;
-    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
+    if (has('form1099div')) score += 15;
+    if (has('ombno15450110')) score += 20; // DIV OMB No.
+    score += count(['totalordinarydividends', 'qualifieddividends', 'totalcapitalgaindist', 'capitalgain', 'federalincometaxwithheld']) * 10;
+    score += count(['copyb', 'copyc', 'copya', 'copy1']) * 4;
   }
   else if (cat === '1099-r') {
-    if (has(['form 1099-r', 'form 1099r', 'form 1099 r'])) score += 12;
-    score += count(['gross distribution', 'taxable amount', 'distribution code', 'distribution code(s)', 'federal income tax withheld']) * 6;
-    score += count(['copy b', 'copy c', 'copy a', 'copy 1']) * 3;
+    if (has('form1099r')) score += 15;
+    if (has('ombno15450119')) score += 20; // R OMB No.
+    score += count(['grossdistribution', 'taxableamount', 'distributioncode', 'federalincometaxwithheld']) * 10;
+    score += count(['copyb', 'copyc', 'copya', 'copy1']) * 4;
   }
   else if (cat === '1095-a' || cat === '1095a') {
-    if (has(['form 1095-a', 'form 1095a', 'form 1095 a'])) score += 12;
-    score += count(['health insurance marketplace statement', 'marketplace identifier', 'policy number', 'monthly enrollment premiums', 'annual enrollment premiums', 'monthly advance payment of premium tax credit', 'annual advance ptc']) * 6;
+    if (has('form1095a')) score += 15;
+    if (has('ombno15452232')) score += 20; // 1095-A OMB No.
+    score += count(['healthinsurancemarketplacestatement', 'marketplaceidentifier', 'policynumber', 'monthlyenrollmentpremiums', 'annualenrollmentpremiums', 'monthlyadvancepaymentofpremiumtaxcredit', 'annualadvanceptc']) * 10;
   }
   else if (cat === '1099-ssa' || cat === 'ssa-1099' || cat === 'ssa1099') {
-    if (has(['ssa-1099', 'form ssa-1099', 'ssa1099'])) score += 12;
-    score += count(['social security benefit statement', 'benefits paid', 'net benefits', 'net social security benefits', 'federal income tax withheld']) * 6;
+    if (has('formssa1099') || has('ssa1099')) score += 15;
+    if (has('ombno09600616')) score += 20; // SSA OMB No.
+    score += count(['socialsecuritybenefitstatement', 'benefitspaid', 'netbenefits', 'netsocialsecuritybenefits', 'federalincometaxwithheld']) * 10;
   }
   else if (cat === '1098') {
-    if (has(['form 1098', 'form 1098', 'form 1098'])) score += 12;
-    score += count(['mortgage interest statement', 'mortgage interest received', 'outstanding mortgage principal', 'outstanding principal', 'mortgage origination date', 'origination date', 'refund of overpaid interest', 'interest refund', 'mortgage insurance premiums', 'points paid', 'real estate taxes']) * 6;
+    if (has('form1098')) score += 15;
+    if (has('ombno15451380')) score += 20; // 1098 OMB No.
+    score += count(['mortgageintereststatement', 'mortgageinterestreceived', 'outstandingmortgageprincipal', 'outstandingprincipal', 'mortgageoriginationdate', 'originationdate', 'refundofoverpaidinterest', 'interestrefund', 'mortgageinsurancepremiums', 'pointspaid', 'realestatetaxes']) * 8;
+    score += count(['copyb', 'copyc', 'copya', 'copy1']) * 4;
+    score += count(['departmentofthetreasury', 'internalrevenueservice']) * 3;
   }
 
   return score;
