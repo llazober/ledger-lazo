@@ -253,6 +253,21 @@ Extract the values for the following boxes of Form SSA-1099 (Social Security Ben
 - Recipient's SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
 `;
       jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "benefitsPaid", "fedIncomeTax", "netBenefits"`;
+    } else if (lowerFormType.includes('1098')) {
+      promptInstructions = `
+Extract the values for the following boxes of Form 1098 (Mortgage Interest Statement):
+- Lender's TIN/EIN (lenderEin) -> Format as string (e.g. "XX-XXXXXXX").
+- Borrower's TIN/SSN (borrowerSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 1: Mortgage interest received (mortgageInterest) -> Numeric value (float or integer).
+- Box 2: Outstanding mortgage principal (outstandingPrincipal) -> Numeric value (float or integer).
+- Box 3: Mortgage origination date (originationDate) -> String (e.g. "MM/DD/YYYY").
+- Box 4: Refund of overpaid interest (interestRefund) -> Numeric value (float or integer).
+- Box 5: Mortgage insurance premiums (mortgageInsurance) -> Numeric value (float or integer).
+- Box 6: Points paid for purchase of principal residence (pointsPaid) -> Numeric value (float or integer).
+- Box 7: Property address or description (propertyAddress) -> String.
+- Box 10: Real estate taxes (realEstateTaxes) -> Numeric value (float or integer).
+`;
+      jsonSchemaKeysDescription = `"lenderEin", "borrowerSsn", "mortgageInterest", "outstandingPrincipal", "originationDate", "interestRefund", "mortgageInsurance", "pointsPaid", "propertyAddress", "realEstateTaxes"`;
     } else if (lowerFormType.includes('1099') || lowerFormType.includes('unclassified') || lowerFormType.includes('other')) {
       promptInstructions = `
 This is a general or unclassified Form ${formType}.
@@ -349,7 +364,7 @@ ${jsonSchemaKeysDescription}`;
     const cleanedBoxes: Record<string, any> = {};
     for (const key of Object.keys(parsedData)) {
       const val = parsedData[key];
-      if (key === 'employeeSsn' || key === 'employerEin' || key === 'payerEin' || key === 'recipientSsn') {
+      if (['employeeSsn', 'employerEin', 'payerEin', 'recipientSsn', 'lenderEin', 'borrowerSsn', 'propertyAddress', 'originationDate', 'spouseSsn', 'policyNumber', 'marketplaceIdentifier', 'policyStartDate', 'policyTerminationDate', 'recipientName', 'distributionCode'].includes(key)) {
         cleanedBoxes[key] = cleanStr(val);
       } else {
         cleanedBoxes[key] = cleanFloat(val);

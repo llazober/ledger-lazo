@@ -158,6 +158,8 @@ export async function POST(req: Request) {
       keysToCompare = ['marketplaceIdentifier', 'policyNumber', 'recipientName', 'recipientSsn', 'spouseSsn', 'policyStartDate', 'policyTerminationDate', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc'];
     } else if (formLower.includes('1099-ssa') || formLower.includes('ssa-1099')) {
       keysToCompare = ['payerEin', 'recipientSsn', 'benefitsPaid', 'fedIncomeTax', 'netBenefits'];
+    } else if (formLower.includes('1098')) {
+      keysToCompare = ['lenderEin', 'borrowerSsn', 'mortgageInterest', 'outstandingPrincipal', 'originationDate', 'interestRefund', 'mortgageInsurance', 'pointsPaid', 'propertyAddress', 'realEstateTaxes'];
     } else {
       const pdfKeys = Object.keys(pdfBoxes);
       const imgKeys = Object.keys(consolidatedBoxes);
@@ -171,7 +173,8 @@ export async function POST(req: Request) {
       'totalOrdinaryDividends', 'qualifiedDividends', 'totalCapitalGainDist', 
       'grossDistribution', 'taxableAmount', 'stateIncomeTax', 'stateDistribution',
       'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc',
-      'benefitsPaid', 'netBenefits'
+      'benefitsPaid', 'netBenefits',
+      'mortgageInterest', 'outstandingPrincipal', 'interestRefund', 'mortgageInsurance', 'pointsPaid', 'realEstateTaxes'
     ];
 
     function normalizeString(val: any): string {

@@ -147,7 +147,7 @@ ${rawText}
 ---
 
 Your task:
-1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
 2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
 3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2026, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
@@ -209,7 +209,7 @@ Format your output as a JSON object with keys:
         console.log(`[Document Route] Converting PDF ${name} to PNG for manual verification...`);
         const { convertPdfToImages } = await import('@/lib/pdf-converter');
         const fileBuffer = Buffer.from(fileData, 'base64');
-        const pagesBase64 = await convertPdfToImages(fileBuffer, 4);
+        const pagesBase64 = await convertPdfToImages(fileBuffer, 4, document.category);
         for (let i = 0; i < pagesBase64.length; i++) {
           const imageBase64 = pagesBase64[i];
           const imageName = pagesBase64.length === 1
@@ -245,7 +245,7 @@ Format your output as a JSON object with keys:
       }
 
       // If document is W2, 1099, or 1095-A, extract tax form fields from PDF text layer
-      if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A') {
+      if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
         try {
           await extractAndSaveTaxFormData(document.id, document.category, extractedText);
         } catch (tfErr) {

@@ -102,6 +102,10 @@ function fallbackClassifier(filename: string) {
     category = '1095-A';
     aiSummary = '1095-A Health Insurance Marketplace Statement.';
     confidenceScore = 0.9;
+  } else if (nameLower.includes('1098')) {
+    category = '1098';
+    aiSummary = '1098 Mortgage Interest Statement.';
+    confidenceScore = 0.9;
   } else if (nameLower.includes('ssa-1099') || nameLower.includes('ssa1099') || nameLower.includes('social security')) {
     category = 'SSA-1099';
     aiSummary = 'SSA-1099 Social Security Benefit Statement.';
@@ -455,7 +459,7 @@ ${extractedText}
 ---
 
 Your task:
-1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
 2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
 3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2026, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
@@ -507,7 +511,7 @@ Format your output as a JSON object with keys:
           const { convertPdfToImages } = await import('@/lib/pdf-converter');
           const fileBuffer = Buffer.from(finalBase64, 'base64');
           // Convert up to 4 pages of the PDF to companion images
-          const pagesBase64 = await convertPdfToImages(fileBuffer, 4);
+          const pagesBase64 = await convertPdfToImages(fileBuffer, 4, doc.category);
           for (let i = 0; i < pagesBase64.length; i++) {
             const imageBase64 = pagesBase64[i];
             const imageName = pagesBase64.length === 1
@@ -543,7 +547,7 @@ Format your output as a JSON object with keys:
         }
 
         // If the document is W2, 1099, or 1095-A, run the unified tax form field extractor
-        if (doc.category === 'W2' || doc.category.startsWith('1099') || doc.category.includes('1099') || doc.category === '1095-A') {
+        if (doc.category === 'W2' || doc.category.startsWith('1099') || doc.category.includes('1099') || doc.category === '1095-A' || doc.category === '1098') {
           try {
             await extractAndSaveTaxFormData(doc.id, doc.category, extractedText);
           } catch (tfErr) {

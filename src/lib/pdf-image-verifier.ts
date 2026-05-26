@@ -47,6 +47,8 @@ export function compareFields(formType: string, pdfBoxes: Record<string, any>, i
     keysToCompare = ['marketplaceIdentifier', 'policyNumber', 'recipientName', 'recipientSsn', 'spouseSsn', 'policyStartDate', 'policyTerminationDate', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc'];
   } else if (formLower.includes('1099-ssa') || formLower.includes('ssa-1099')) {
     keysToCompare = ['payerEin', 'recipientSsn', 'benefitsPaid', 'fedIncomeTax', 'netBenefits'];
+  } else if (formLower.includes('1098')) {
+    keysToCompare = ['lenderEin', 'borrowerSsn', 'mortgageInterest', 'outstandingPrincipal', 'originationDate', 'interestRefund', 'mortgageInsurance', 'pointsPaid', 'propertyAddress', 'realEstateTaxes'];
   } else {
     // Other forms or generic 1099 forms: compare overlapping keys
     const pdfKeys = Object.keys(pdfBoxes);
@@ -63,7 +65,8 @@ export function compareFields(formType: string, pdfBoxes: Record<string, any>, i
     'totalOrdinaryDividends', 'qualifiedDividends', 'totalCapitalGainDist', 
     'grossDistribution', 'taxableAmount', 'stateIncomeTax', 'stateDistribution',
     'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc',
-    'benefitsPaid', 'netBenefits'
+    'benefitsPaid', 'netBenefits',
+    'mortgageInterest', 'outstandingPrincipal', 'interestRefund', 'mortgageInsurance', 'pointsPaid', 'realEstateTaxes'
   ];
 
   for (const key of keysToCompare) {

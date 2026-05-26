@@ -113,8 +113,19 @@ const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?:
     { label: "Box 33A: Annual Enrollment Premiums", key: "annualEnrollmentPremiums", isMonetary: true },
     { label: "Box 33B: Annual SLCSP Premium", key: "annualSlcspPremium", isMonetary: true },
     { label: "Box 33C: Annual Advance PTC", key: "annualAdvancePtc", isMonetary: true }
+  ],
+  "1098": [
+    { label: "Lender's TIN/EIN", key: "lenderEin", isMono: true },
+    { label: "Borrower's SSN/TIN", key: "borrowerSsn", isMono: true },
+    { label: "Box 1: Mortgage Interest", key: "mortgageInterest", isMonetary: true },
+    { label: "Box 2: Outstanding Principal", key: "outstandingPrincipal", isMonetary: true },
+    { label: "Box 3: Origination Date", key: "originationDate", isMono: true },
+    { label: "Box 4: Interest Refund", key: "interestRefund", isMonetary: true },
+    { label: "Box 5: Mortgage Insurance", key: "mortgageInsurance", isMonetary: true },
+    { label: "Box 6: Points Paid", key: "pointsPaid", isMonetary: true },
+    { label: "Box 7: Property Address", key: "propertyAddress" },
+    { label: "Box 10: Real Estate Taxes", key: "realEstateTaxes", isMonetary: true }
   ]
-
 };
 
 const readFileAsBase64 = (file: File | Blob): Promise<string> => {
