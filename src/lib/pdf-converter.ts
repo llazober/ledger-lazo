@@ -1,4 +1,4 @@
-import { createCanvas, Path2D } from '@napi-rs/canvas';
+import { createCanvas, Path2D, DOMMatrix, DOMPoint, DOMRect } from '@napi-rs/canvas';
 import path from 'path';
 import { pathToFileURL } from 'url';
 
@@ -12,18 +12,13 @@ import { pathToFileURL } from 'url';
  * @returns Array of base64-encoded PNG images.
  */
 export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3): Promise<string[]> {
-  // Mock DOMMatrix globally if not present
-  if (typeof (global as any).DOMMatrix === 'undefined') {
-    (global as any).DOMMatrix = class DOMMatrix {
-      a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
-      constructor() {}
-    };
-  }
-
-  // Set global Path2D so PDF.js CanvasGraphics uses native Path2D
-  if (typeof (global as any).Path2D === 'undefined') {
-    (global as any).Path2D = Path2D;
-  }
+  // Unconditionally set global native Path2D, DOMMatrix, DOMPoint, and DOMRect classes from @napi-rs/canvas.
+  // This prevents other libraries (like pdf-parse) from polluting the global scope with non-native mocks
+  // which causes Canvas context methods to fail with "Value is none of these types String, Path" errors.
+  (global as any).DOMMatrix = DOMMatrix;
+  (global as any).Path2D = Path2D;
+  (global as any).DOMPoint = DOMPoint;
+  (global as any).DOMRect = DOMRect;
 
   // Dynamically import pdfjs-dist legacy ESM build for compatibility in Node environments
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
