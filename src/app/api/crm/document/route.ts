@@ -278,7 +278,18 @@ export async function PATCH(req: Request) {
 
       if (isPdf && fileBuffer) {
         try {
-          console.log(`[Reprocess] Running OpenAI Files API OCR for PDF document ${docId}...`);
+          console.log(`[Reprocess] Running PDF-to-Image dual-pass verification for document ${docId}...`);
+          const { verifyPdfDocument } = await import('@/lib/pdf-image-verifier');
+          const verifiedDoc = await verifyPdfDocument(existingDoc.id, fileBuffer);
+          if (verifiedDoc) {
+            return NextResponse.json({ success: true, document: verifiedDoc });
+          }
+        } catch (verifyErr) {
+          console.error('[Reprocess] Dual-pass verification failed:', verifyErr);
+        }
+
+        try {
+          console.log(`[Reprocess] Falling back to OpenAI Files API OCR for PDF document ${docId}...`);
           const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
           const visionText = await performVisionOcrWithFilesApi(fileBuffer, existingDoc.name);
           

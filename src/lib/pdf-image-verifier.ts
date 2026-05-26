@@ -140,13 +140,19 @@ export async function verifyPdfDocument(pdfDocId: string, pdfBuffer: Buffer) {
       return null;
     }
 
+    const nameLower = pdfDoc.name.toLowerCase();
     const isTaxForm = pdfDoc.category === 'W2' || 
                       pdfDoc.category.startsWith('1099') || 
                       pdfDoc.category.includes('1099') || 
-                      pdfDoc.category === '1095-A';
+                      pdfDoc.category === '1095-A' ||
+                      pdfDoc.category === 'UNCLASSIFIED' ||
+                      nameLower.includes('w2') ||
+                      nameLower.includes('w-2') ||
+                      nameLower.includes('1099') ||
+                      nameLower.includes('1095');
     
     if (!isTaxForm) {
-      console.log(`[PDF Image Verifier] Category "${pdfDoc.category}" is not a verified tax form type. Skipping image validation.`);
+      console.log(`[PDF Image Verifier] Category "${pdfDoc.category}" is not a verified tax form type and name does not suggest a tax form. Skipping image validation.`);
       return pdfDoc;
     }
 
@@ -253,6 +259,16 @@ Format your output as a JSON object with keys:
 
     const classResult = JSON.parse(classificationResponse.choices[0].message?.content || '{}');
     const imageCategory = classResult.category || pdfDoc.category;
+
+    // Sync category to PDF document if different (e.g., if PDF was UNCLASSIFIED)
+    if (pdfDoc.category !== imageCategory) {
+      console.log(`[PDF Image Verifier] PDF category mismatch (PDF: "${pdfDoc.category}", Image: "${imageCategory}"). Syncing PDF category.`);
+      await prisma.document.update({
+        where: { id: pdfDocId },
+        data: { category: imageCategory }
+      });
+      pdfDoc.category = imageCategory;
+    }
 
     // Update image document with results
     await prisma.document.update({
