@@ -210,27 +210,44 @@ Format your output as a JSON object with keys:
         console.error("Failed to generate document chunks on create:", chunkErr);
       }
 
-      // If document is W2, 1099, or 1095-A, extract tax form fields
+      // If document is W2, 1099, or 1095-A, extract tax form fields from PDF text layer
       if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A') {
         try {
           await extractAndSaveTaxFormData(document.id, document.category, extractedText);
         } catch (tfErr) {
           console.error("Failed to extract tax form data on create:", tfErr);
         }
+      }
 
-        // Run PDF-to-Image dual-pass validation
-        const isPdf = fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-        if (isPdf && fileData) {
-          try {
-            const { verifyPdfDocument } = await import('@/lib/pdf-image-verifier');
-            const fileBuffer = Buffer.from(fileData, 'base64');
-            const verifiedDoc = await verifyPdfDocument(document.id, fileBuffer);
-            if (verifiedDoc) {
-              finalDocument = verifiedDoc;
-            }
-          } catch (verifyErr) {
-            console.error("Failed to perform dual-pass image verification:", verifyErr);
+      // Convert PDF page 1 to a companion PNG image document for manual review
+      const isPdf = fileType?.toLowerCase() === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+      if (isPdf && fileData) {
+        try {
+          console.log(`[Document Route] Converting PDF ${name} to PNG for manual verification...`);
+          const { convertPdfToImages } = await import('@/lib/pdf-converter');
+          const fileBuffer = Buffer.from(fileData, 'base64');
+          const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
+          if (pagesBase64 && pagesBase64.length > 0) {
+            const imageBase64 = pagesBase64[0];
+            const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+            
+            await prisma.document.create({
+              data: {
+                clientId: document.clientId,
+                name: imageName,
+                url: '#',
+                fileSize: Math.round(imageBase64.length * 0.75),
+                fileType: 'PNG',
+                taxYear: document.taxYear,
+                category: 'UNCLASSIFIED',
+                status: 'UPLOADED',
+                fileData: imageBase64,
+              }
+            });
+            console.log(`[Document Route] Successfully created companion PNG: ${imageName}`);
           }
+        } catch (imgErr) {
+          console.error("Failed to generate companion PNG on upload:", imgErr);
         }
       }
     }
@@ -278,18 +295,7 @@ export async function PATCH(req: Request) {
 
       if (isPdf && fileBuffer) {
         try {
-          console.log(`[Reprocess] Running PDF-to-Image dual-pass verification for document ${docId}...`);
-          const { verifyPdfDocument } = await import('@/lib/pdf-image-verifier');
-          const verifiedDoc = await verifyPdfDocument(existingDoc.id, fileBuffer);
-          if (verifiedDoc) {
-            return NextResponse.json({ success: true, document: verifiedDoc });
-          }
-        } catch (verifyErr) {
-          console.error('[Reprocess] Dual-pass verification failed:', verifyErr);
-        }
-
-        try {
-          console.log(`[Reprocess] Falling back to OpenAI Files API OCR for PDF document ${docId}...`);
+          console.log(`[Reprocess] Running OpenAI Files API OCR for PDF document ${docId}...`);
           const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
           const visionText = await performVisionOcrWithFilesApi(fileBuffer, existingDoc.name);
           

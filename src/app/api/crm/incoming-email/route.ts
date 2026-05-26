@@ -460,20 +460,37 @@ export async function POST(req: Request) {
           } catch (tfErr) {
             console.error("Failed to extract tax form data for email attachment:", tfErr);
           }
+        }
 
-          // Run PDF-to-Image dual-pass validation
-          const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-          if (isPdf && finalBase64) {
-            try {
-              const { verifyPdfDocument } = await import('@/lib/pdf-image-verifier');
-              const fileBuffer = Buffer.from(finalBase64, 'base64');
-              const verifiedDoc = await verifyPdfDocument(doc.id, fileBuffer);
-              if (verifiedDoc) {
-                finalDoc = verifiedDoc;
-              }
-            } catch (verifyErr) {
-              console.error("Failed to perform dual-pass image verification on email attachment:", verifyErr);
+        // Convert PDF page 1 to a companion PNG image document for manual review
+        const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+        if (isPdf && finalBase64) {
+          try {
+            console.log(`[Email Route] Converting PDF attachment ${name} to PNG for manual verification...`);
+            const { convertPdfToImages } = await import('@/lib/pdf-converter');
+            const fileBuffer = Buffer.from(finalBase64, 'base64');
+            const pagesBase64 = await convertPdfToImages(fileBuffer, 1);
+            if (pagesBase64 && pagesBase64.length > 0) {
+              const imageBase64 = pagesBase64[0];
+              const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+              
+              await prisma.document.create({
+                data: {
+                  clientId: doc.clientId,
+                  name: imageName,
+                  url: '#',
+                  fileSize: Math.round(imageBase64.length * 0.75),
+                  fileType: 'PNG',
+                  taxYear: doc.taxYear,
+                  category: 'UNCLASSIFIED',
+                  status: 'UPLOADED',
+                  fileData: imageBase64,
+                }
+              });
+              console.log(`[Email Route] Successfully created companion PNG: ${imageName}`);
             }
+          } catch (imgErr) {
+            console.error("Failed to generate companion PNG for email attachment:", imgErr);
           }
         }
       }
