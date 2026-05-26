@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    webpackBuildWorker: false,
+    webpackBuildWorker: true,
     webpackMemoryOptimizations: true,
   },
 };
