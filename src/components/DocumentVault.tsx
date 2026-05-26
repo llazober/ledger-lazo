@@ -434,11 +434,39 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     if (!activeDoc) return;
     setIsComparing(true);
     try {
+      // Find the document ID to target
+      let targetDocId = activeDoc.id;
+      let isPngActive = false;
+      let activePdfId = activeDoc.id;
+      
+      const isImage = activeDoc.name.toLowerCase().endsWith('.png') || 
+                      activeDoc.name.toLowerCase().endsWith('.jpg') || 
+                      activeDoc.name.toLowerCase().endsWith('.jpeg');
+                      
+      if (isImage) {
+        isPngActive = true;
+        const baseName = activeDoc.name
+          .replace(/\s*\(Image Verification.*?\)/i, '')
+          .replace(/\.(png|jpg|jpeg)$/i, '');
+          
+        const parentPdf = docs.find(d => 
+          d.name.toLowerCase().startsWith(baseName.toLowerCase()) && 
+          d.name.toLowerCase().endsWith('.pdf')
+        );
+        
+        if (parentPdf) {
+          targetDocId = parentPdf.id;
+          activePdfId = parentPdf.id;
+        } else {
+          throw new Error("Could not find the parent PDF document for this verification image.");
+        }
+      }
+
       const res = await fetch('/accounting/api/crm/document/compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          documentId: activeDoc.id
+          documentId: targetDocId
         })
       });
 
@@ -450,21 +478,23 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
       const data = await res.json();
 
       if (data.success && data.document) {
-        // Update local state list
-        setDocs(prev => prev.map(d => d.id === activeDoc.id ? {
+        // Update local state list for the parent PDF
+        setDocs(prev => prev.map(d => d.id === activePdfId ? {
           ...d,
           status: data.document.status,
           validationErrors: data.document.validationErrors,
           taxFormData: data.document.taxFormData
         } : d));
 
-        // Update active document state
-        setActiveDoc(prev => prev && prev.id === activeDoc.id ? {
-          ...prev,
-          status: data.document.status,
-          validationErrors: data.document.validationErrors,
-          taxFormData: data.document.taxFormData
-        } : prev);
+        // If the active document is the PDF, update its state
+        if (!isPngActive) {
+          setActiveDoc(prev => prev && prev.id === activePdfId ? {
+            ...prev,
+            status: data.document.status,
+            validationErrors: data.document.validationErrors,
+            taxFormData: data.document.taxFormData
+          } : prev);
+        }
 
         if (data.hadDiscrepancies) {
           alert(`Discrepancies detected and resolved!\n\nMismatched fields updated from PNG: ${data.mismatches.join(', ')}.\nDocument is now flag-corrected and verified!`);
@@ -1170,25 +1200,39 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                     "🔄 Re-Run Vision OCR Fallback"
                   )}
                 </button>
-                {activeDoc.name.toLowerCase().endsWith('.pdf') && (
-                  <button
-                    onClick={handleComparePdfPng}
-                    disabled={isComparing}
-                    className="w-full text-xs text-emerald-400 hover:text-emerald-300 font-extrabold flex items-center justify-center gap-2 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/30 transition-all hover:scale-[1.01] uppercase tracking-wider disabled:opacity-50"
-                  >
-                    {isComparing ? (
-                      <span className="flex items-center justify-center gap-1.5">
-                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Comparing PDF & PNG...
-                      </span>
-                    ) : (
-                      "🔍 Compare PDF & PNG Data"
-                    )}
-                  </button>
-                )}
+                {(() => {
+                  const nameLower = activeDoc.name.toLowerCase();
+                  const isPdf = nameLower.endsWith('.pdf');
+                  let hasTarget = isPdf;
+                  if (!isPdf) {
+                    const baseName = nameLower
+                      .replace(/\s*\(image verification.*?\)/i, '')
+                      .replace(/\.(png|jpg|jpeg)$/i, '');
+                    hasTarget = docs.some(d => 
+                      d.name.toLowerCase().startsWith(baseName) && 
+                      d.name.toLowerCase().endsWith('.pdf')
+                    );
+                  }
+                  return hasTarget && (
+                    <button
+                      onClick={handleComparePdfPng}
+                      disabled={isComparing}
+                      className="w-full text-xs text-emerald-400 hover:text-emerald-300 font-extrabold flex items-center justify-center gap-2 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/30 transition-all hover:scale-[1.01] uppercase tracking-wider disabled:opacity-50"
+                    >
+                      {isComparing ? (
+                        <span className="flex items-center justify-center gap-1.5">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Comparing PDF & PNG...
+                        </span>
+                      ) : (
+                        "🔍 Compare PDF & PNG Data"
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
 
               {activeDoc.aiSummary && (
