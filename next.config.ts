@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  productionBrowserSourceMaps: false,
   experimental: {
     webpackBuildWorker: false,
     webpackMemoryOptimizations: true,
