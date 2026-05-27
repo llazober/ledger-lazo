@@ -140,6 +140,8 @@ export async function POST(req: Request) {
 
         if (hasOpenAI) {
           try {
+            const currentYear = new Date().getFullYear();
+            const previousYear = currentYear - 1;
             const prompt = `You are an expert CPA Tax Assistant.
 Analyze the following raw OCR text extracted from an uploaded client document:
 ---
@@ -149,7 +151,7 @@ ${rawText}
 Your task:
 1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
 2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
-3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2025 or 2026, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
 5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
 
@@ -376,6 +378,8 @@ export async function PATCH(req: Request) {
 
         if (hasOpenAI) {
           try {
+            const currentYear = new Date().getFullYear();
+            const previousYear = currentYear - 1;
             const prompt = `You are an expert CPA Tax Assistant.
 Analyze the following raw OCR text extracted from an uploaded client document:
 ---
@@ -385,7 +389,7 @@ ${rawText}
 Your task:
 1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
 2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
-3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2025 or 2026, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
 5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
 
