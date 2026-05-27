@@ -237,11 +237,6 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
 
       const pngBuffer = canvas.toBuffer('image/png');
       imagesBase64.push(pngBuffer.toString('base64'));
-
-      // Clean up local variables immediately to aid V8 garbage collection
-      (canvas as any) = null;
-      (context as any) = null;
-      (page as any) = null;
     } catch (pageErr) {
       console.error(`[PDF Converter] Failed to render page ${pageToRender}:`, pageErr);
     }
