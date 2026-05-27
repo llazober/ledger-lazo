@@ -213,6 +213,7 @@ export async function POST(req: Request) {
 
     // 2. Process attachments and perform AI classification
     const createdDocuments = [];
+    const createdDocumentsInfoForBg = [];
 
     console.log(`[Incoming Email API] Request received from ${fromEmail} (Subject: "${subject}")`);
     
@@ -290,8 +291,8 @@ export async function POST(req: Request) {
         name = `${name}.${deducedExt}`;
       }
 
-      // Classify the document category using OpenAI
-      const aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
+      // Fast initial regex classification
+      const fallbackResult = fallbackClassifier(name);
 
       // Save attachment binary (direct base64 from n8n or fetch from URL)
       let fileDataBase64: string | null = data || null;
@@ -323,132 +324,7 @@ export async function POST(req: Request) {
         convertedFileType = attachmentExtension.toUpperCase();
       }
 
-      const status = (aiResult.validationErrors || aiResult.category === 'UNCLASSIFIED' || aiResult.category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
-      const validationErrors = aiResult.validationErrors;
-
-      let extractedText = '';
-      if (finalBase64) {
-        const fileExt = attachmentExtension || '';
-        const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-        const isDocx = ['docx', 'doc'].includes(fileExt) || name?.toLowerCase().endsWith('.docx') || name?.toLowerCase().endsWith('.doc');
-        const isTxt = fileExt === 'txt' || name?.toLowerCase().endsWith('.txt');
-
-        if (isTxt) {
-          try {
-            const fileBuffer = Buffer.from(finalBase64, 'base64');
-            extractedText = fileBuffer.toString('utf-8');
-          } catch (txtErr: any) {
-            console.error("TXT parse failed:", txtErr);
-          }
-        } else if (isDocx) {
-          try {
-            const fileBuffer = Buffer.from(finalBase64, 'base64');
-            const mammoth = require('mammoth');
-            const result = await mammoth.extractRawText({ buffer: fileBuffer });
-            extractedText = result.value || '';
-          } catch (docxErr: any) {
-            console.error("DOCX parse failed:", docxErr);
-          }
-        } else if (isPdf) {
-          const fileBuffer = Buffer.from(finalBase64, 'base64');
-          try {
-            if (typeof (global as any).DOMMatrix === 'undefined') {
-              (global as any).DOMMatrix = class {};
-            }
-            const pdfParseModule = require('pdf-parse');
-            const PDFParseClass = pdfParseModule.PDFParse;
-            
-            if (PDFParseClass) {
-              const parser = new PDFParseClass(new Uint8Array(fileBuffer));
-              const result = await parser.getText();
-              extractedText = result.text || '';
-            } else {
-              const pdfParse = typeof pdfParseModule === 'function' ? pdfParseModule : pdfParseModule.default;
-              const pdfData = await pdfParse(fileBuffer);
-              extractedText = pdfData.text || '';
-            }
-          } catch (pdfErr: any) {
-            console.error("PDF parse failed:", pdfErr);
-          }
-
-          // If PDF text layer is nearly empty, it's a scanned PDF — fall back to Vision OCR
-          const cleanPdfText = extractedText.replace(/[\s\-\d]/g, '');
-          if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY) {
-            console.log('[Email Route] Scanned PDF detected — using OpenAI Files API for high-fidelity OCR...');
-            try {
-              const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
-              const visionText = await performVisionOcrWithFilesApi(fileBuffer, name || 'email_attachment.pdf');
-              
-              if (visionText && visionText.trim().length > 50) {
-                extractedText = visionText;
-                console.log('[Email Route] OpenAI Files API vision OCR succeeded. Text length:', visionText.length);
-              } else {
-                console.warn('[Email Route] OpenAI Files API vision OCR returned minimal text.');
-              }
-            } catch (visionFallbackErr: any) {
-              console.error('[Email Route] OpenAI Files API vision OCR failed:', visionFallbackErr?.message);
-            }
-          }
-        } else if (isImage && process.env.OPENAI_API_KEY) {
-          try {
-            let openAiMimeType = 'image/png';
-            const extLower = fileExt.toLowerCase();
-            if (extLower === 'jpg' || extLower === 'jpeg') {
-              openAiMimeType = 'image/jpeg';
-            } else if (extLower === 'webp') {
-              openAiMimeType = 'image/webp';
-            } else if (extLower === 'gif') {
-              openAiMimeType = 'image/gif';
-            } else if (extLower === 'heic' || extLower === 'heif') {
-              openAiMimeType = 'image/heic';
-            }
-
-            const response = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
-              messages: [
-                {
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: 'Transcribe all visible text from this document image. Focus on capturing numbers, labels, forms fields, employer names, wages, and social security benefit values precisely.' },
-                    {
-                      type: 'image_url',
-                      image_url: {
-                        url: `data:${openAiMimeType};base64,${finalBase64}`
-                      }
-                    }
-                  ]
-                }
-              ]
-            });
-            extractedText = response.choices[0].message?.content || '';
-          } catch (visionErr) {
-            console.error("OpenAI vision parse failed for email attachment:", visionErr);
-          }
-        }
-      }
-
-      // Clean up extractedText whitespace
-      extractedText = extractedText.trim();
-
-      // Clear all spaces/hyphens and check for unique OMB control numbers
-      const cleanTextForOMB = extractedText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
-      let detectedCategory: string | null = null;
-      if (cleanTextForOMB.includes('15451380')) detectedCategory = '1098';
-      else if (cleanTextForOMB.includes('15450008')) detectedCategory = 'W2';
-      else if (cleanTextForOMB.includes('15450112')) detectedCategory = '1099-INT';
-      else if (cleanTextForOMB.includes('15450110')) detectedCategory = '1099-DIV';
-      else if (cleanTextForOMB.includes('15450119')) detectedCategory = '1099-R';
-      else if (cleanTextForOMB.includes('15452232')) detectedCategory = '1095-A';
-      else if (cleanTextForOMB.includes('09600616')) detectedCategory = '1099-SSA';
-      else if (cleanTextForOMB.includes('15450115')) {
-        detectedCategory = cleanTextForOMB.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
-      }
-
-      if (detectedCategory) {
-        console.log(`[Email Route] OMB fingerprint matched: ${detectedCategory}. Overriding category.`);
-        aiResult.category = detectedCategory;
-      }
-
+      // Create document immediately in OCR_PROCESSING status
       const doc = await prisma.document.create({
         data: {
           clientId: client.id,
@@ -457,23 +333,176 @@ export async function POST(req: Request) {
           fileSize: convertedSize,
           fileType: convertedFileType,
           taxYear: 2026,
-          category: aiResult.category,
-          status,
-          extractedText: extractedText || null,
-          aiSummary: aiResult.aiSummary,
-          confidenceScore: aiResult.confidenceScore,
-          validationErrors,
+          category: fallbackResult.category,
+          status: 'OCR_PROCESSING',
+          extractedText: null,
+          aiSummary: 'Processing document...',
+          confidenceScore: fallbackResult.confidenceScore,
+          validationErrors: null,
           fileData: finalBase64
         }
       });
 
-      // Re-classify the document category if initial classification is vague or to confirm tax form category using extracted OCR text
-      if (extractedText && (doc.category === 'UNCLASSIFIED' || doc.category.startsWith('1099') || doc.category === 'W2' || doc.category === '1098' || doc.category === '1095-A')) {
-        try {
-          console.log(`[Email Route] Confirming/refining initial category (${doc.category}) based on OCR text...`);
-          const currentYear = new Date().getFullYear();
-          const previousYear = currentYear - 1;
-          const prompt = `You are an expert CPA Tax Assistant.
+      createdDocuments.push(doc);
+      createdDocumentsInfoForBg.push({
+        id: doc.id,
+        name: convertedName,
+        attachmentExtension,
+        finalBase64,
+        clientId: client.id
+      });
+    }
+
+    // Trigger background processing sequentially
+    if (createdDocumentsInfoForBg.length > 0) {
+      console.log(`[Email Route] Queued ${createdDocumentsInfoForBg.length} documents for sequential background processing...`);
+      (async () => {
+        for (const docInfo of createdDocumentsInfoForBg) {
+          try {
+            console.log(`[Email Background Worker] Processing document: ${docInfo.name} (${docInfo.id})`);
+            
+            let extractedText = '';
+            const finalBase64 = docInfo.finalBase64;
+            const attachmentExtension = docInfo.attachmentExtension;
+            const name = docInfo.name;
+
+            if (finalBase64) {
+              const fileExt = attachmentExtension || '';
+              const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+              const isDocx = ['docx', 'doc'].includes(fileExt) || name?.toLowerCase().endsWith('.docx') || name?.toLowerCase().endsWith('.doc');
+              const isTxt = fileExt === 'txt' || name?.toLowerCase().endsWith('.txt');
+              const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif'].includes(fileExt) ||
+                              /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(name || '');
+
+              if (isTxt) {
+                try {
+                  const fileBuffer = Buffer.from(finalBase64, 'base64');
+                  extractedText = fileBuffer.toString('utf-8');
+                } catch (txtErr: any) {
+                  console.error("TXT parse failed:", txtErr);
+                }
+              } else if (isDocx) {
+                try {
+                  const fileBuffer = Buffer.from(finalBase64, 'base64');
+                  const mammoth = require('mammoth');
+                  const result = await mammoth.extractRawText({ buffer: fileBuffer });
+                  extractedText = result.value || '';
+                } catch (docxErr: any) {
+                  console.error("DOCX parse failed:", docxErr);
+                }
+              } else if (isPdf) {
+                const fileBuffer = Buffer.from(finalBase64, 'base64');
+                try {
+                  if (typeof (global as any).DOMMatrix === 'undefined') {
+                    (global as any).DOMMatrix = class {};
+                  }
+                  const pdfParseModule = require('pdf-parse');
+                  const PDFParseClass = pdfParseModule.PDFParse;
+                  
+                  if (PDFParseClass) {
+                    const parser = new PDFParseClass(new Uint8Array(fileBuffer));
+                    const result = await parser.getText();
+                    extractedText = result.text || '';
+                  } else {
+                    const pdfParse = typeof pdfParseModule === 'function' ? pdfParseModule : pdfParseModule.default;
+                    const pdfData = await pdfParse(fileBuffer);
+                    extractedText = pdfData.text || '';
+                  }
+                } catch (pdfErr: any) {
+                  console.error("PDF parse failed:", pdfErr);
+                }
+
+                // If PDF text layer is nearly empty, it's a scanned PDF — fall back to Vision OCR
+                const cleanPdfText = extractedText.replace(/[\s\-\d]/g, '');
+                if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY) {
+                  console.log(`[Email Background Worker] Scanned PDF detected for ${name} — using OpenAI Files API for high-fidelity OCR...`);
+                  try {
+                    const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
+                    const visionText = await performVisionOcrWithFilesApi(fileBuffer, name || 'email_attachment.pdf');
+                    
+                    if (visionText && visionText.trim().length > 50) {
+                      extractedText = visionText;
+                      console.log(`[Email Background Worker] OpenAI Files API vision OCR succeeded for ${name}. Text length:`, visionText.length);
+                    } else {
+                      console.warn(`[Email Background Worker] OpenAI Files API vision OCR returned minimal text for ${name}.`);
+                    }
+                  } catch (visionFallbackErr: any) {
+                    console.error(`[Email Background Worker] OpenAI Files API vision OCR failed for ${name}:`, visionFallbackErr?.message);
+                  }
+                }
+              } else if (isImage && process.env.OPENAI_API_KEY) {
+                try {
+                  let openAiMimeType = 'image/png';
+                  const extLower = fileExt.toLowerCase();
+                  if (extLower === 'jpg' || extLower === 'jpeg') {
+                    openAiMimeType = 'image/jpeg';
+                  } else if (extLower === 'webp') {
+                    openAiMimeType = 'image/webp';
+                  } else if (extLower === 'gif') {
+                    openAiMimeType = 'image/gif';
+                  } else if (extLower === 'heic' || extLower === 'heif') {
+                    openAiMimeType = 'image/heic';
+                  }
+
+                  const response = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [
+                      {
+                        role: 'user',
+                        content: [
+                          { type: 'text', text: 'Transcribe all visible text from this document image. Focus on capturing numbers, labels, forms fields, employer names, wages, and social security benefit values precisely.' },
+                          {
+                            type: 'image_url',
+                            image_url: {
+                              url: `data:${openAiMimeType};base64,${finalBase64}`
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  });
+                  extractedText = response.choices[0].message?.content || '';
+                } catch (visionErr) {
+                  console.error(`[Email Background Worker] OpenAI vision parse failed for email attachment ${name}:`, visionErr);
+                }
+              }
+            }
+
+            extractedText = extractedText.trim();
+
+            // Run classifyDocumentWithAI using OpenAI
+            const aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
+            let category = aiResult.category;
+            let aiSummary = aiResult.aiSummary;
+            let confidenceScore = aiResult.confidenceScore;
+            let validationErrors = aiResult.validationErrors;
+
+            // Check for OMB fingerprint override
+            const cleanTextForOMB = extractedText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
+            let detectedCategory: string | null = null;
+            if (cleanTextForOMB.includes('15451380')) detectedCategory = '1098';
+            else if (cleanTextForOMB.includes('15450008')) detectedCategory = 'W2';
+            else if (cleanTextForOMB.includes('15450112')) detectedCategory = '1099-INT';
+            else if (cleanTextForOMB.includes('15450110')) detectedCategory = '1099-DIV';
+            else if (cleanTextForOMB.includes('15450119')) detectedCategory = '1099-R';
+            else if (cleanTextForOMB.includes('15452232')) detectedCategory = '1095-A';
+            else if (cleanTextForOMB.includes('09600616')) detectedCategory = '1099-SSA';
+            else if (cleanTextForOMB.includes('15450115')) {
+              detectedCategory = cleanTextForOMB.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
+            }
+
+            if (detectedCategory) {
+              console.log(`[Email Background Worker] OMB fingerprint matched: ${detectedCategory}. Overriding category.`);
+              category = detectedCategory;
+            }
+
+            // Confirm/refine category if vague using extracted OCR text
+            if (extractedText && (category === 'UNCLASSIFIED' || category.startsWith('1099') || category === 'W2' || category === '1098' || category === '1095-A')) {
+              try {
+                console.log(`[Email Background Worker] Confirming/refining category (${category}) based on OCR text...`);
+                const currentYear = new Date().getFullYear();
+                const previousYear = currentYear - 1;
+                const prompt = `You are an expert CPA Tax Assistant.
 Analyze the following raw OCR text extracted from an uploaded client document:
 ---
 ${extractedText}
@@ -489,95 +518,133 @@ Your task:
 Format your output as a JSON object with keys:
 "category", "aiSummary", "confidenceScore", "validationErrors"`;
 
-          const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-            response_format: { type: "json_object" }
-          });
+                const response = await openai.chat.completions.create({
+                  model: 'gpt-4o-mini',
+                  messages: [{ role: 'user', content: prompt }],
+                  response_format: { type: "json_object" }
+                });
 
-          const result = JSON.parse(response.choices[0].message?.content || '{}');
-          
-          if (result.category && result.category !== 'UNCLASSIFIED') {
-            console.log(`[Email Route] Re-classified document ${doc.id} from ${doc.category} to ${result.category}`);
-            const newStatus = (result.validationErrors || result.category === 'UNCLASSIFIED' || result.category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
-            
-            const updated = await prisma.document.update({
-              where: { id: doc.id },
+                const result = JSON.parse(response.choices[0].message?.content || '{}');
+                if (result.category && result.category !== 'UNCLASSIFIED') {
+                  category = result.category;
+                  aiSummary = result.aiSummary || aiSummary;
+                  confidenceScore = result.confidenceScore || confidenceScore;
+                  validationErrors = result.validationErrors;
+                }
+              } catch (reclassErr) {
+                console.error(`[Email Background Worker] Re-classification failed for ${name}:`, reclassErr);
+              }
+            }
+
+            const finalStatus = (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+
+            // Update main document in database
+            await prisma.document.update({
+              where: { id: docInfo.id },
               data: {
-                category: result.category,
-                aiSummary: result.aiSummary || doc.aiSummary,
-                confidenceScore: result.confidenceScore || doc.confidenceScore,
-                validationErrors: result.validationErrors,
-                status: newStatus
+                category,
+                status: finalStatus,
+                extractedText: extractedText || null,
+                aiSummary,
+                confidenceScore,
+                validationErrors
               }
             });
-            doc.category = updated.category;
-            doc.status = updated.status;
-            doc.aiSummary = updated.aiSummary;
-            doc.confidenceScore = updated.confidenceScore;
-            doc.validationErrors = updated.validationErrors;
-          }
-        } catch (reclassErr) {
-          console.error("[Email Route] Re-classification of raw text failed:", reclassErr);
-        }
-      }
 
-      let finalDoc = doc;
-
-      // Convert PDF pages to companion PNG image documents for manual review (independent of text extraction status)
-      const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-      if (isPdf && finalBase64) {
-        try {
-          console.log(`[Email Route] Converting PDF attachment ${name} to PNG for manual verification...`);
-          const { convertPdfToImages } = await import('@/lib/pdf-converter');
-          const fileBuffer = Buffer.from(finalBase64, 'base64');
-          // Convert up to 4 pages of the PDF to companion images
-          const pagesBase64 = await convertPdfToImages(fileBuffer, 4, doc.category);
-          for (let i = 0; i < pagesBase64.length; i++) {
-            const imageBase64 = pagesBase64[i];
-            const imageName = pagesBase64.length === 1
-              ? `${name.replace(/\.pdf$/i, '')} (Image Verification).png`
-              : `${name.replace(/\.pdf$/i, '')} (Image Verification - Page ${i + 1}).png`;
-            
-            await prisma.document.create({
-              data: {
-                clientId: doc.clientId,
-                name: imageName,
-                url: '#',
-                fileSize: Math.round(imageBase64.length * 0.75),
-                fileType: 'PNG',
-                taxYear: doc.taxYear,
-                category: 'UNCLASSIFIED',
-                status: 'UPLOADED',
-                fileData: imageBase64,
+            // Convert PDF pages to companion PNG image documents for manual review
+            const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+            if (isPdf && finalBase64) {
+              try {
+                console.log(`[Email Background Worker] Converting PDF attachment ${name} to PNG for manual verification...`);
+                const { convertPdfToImages } = await import('@/lib/pdf-converter');
+                const fileBuffer = Buffer.from(finalBase64, 'base64');
+                const pagesBase64 = await convertPdfToImages(fileBuffer, 4, category);
+                for (let i = 0; i < pagesBase64.length; i++) {
+                  const imageBase64 = pagesBase64[i];
+                  const imageName = pagesBase64.length === 1
+                    ? `${name.replace(/\.pdf$/i, '')} (Image Verification).png`
+                    : `${name.replace(/\.pdf$/i, '')} (Image Verification - Page ${i + 1}).png`;
+                  
+                  await prisma.document.create({
+                    data: {
+                      clientId: docInfo.clientId,
+                      name: imageName,
+                      url: '#',
+                      fileSize: Math.round(imageBase64.length * 0.75),
+                      fileType: 'PNG',
+                      taxYear: 2026,
+                      category: 'UNCLASSIFIED',
+                      status: 'UPLOADED',
+                      fileData: imageBase64,
+                    }
+                  });
+                  console.log(`[Email Background Worker] Successfully created companion PNG: ${imageName}`);
+                }
+              } catch (imgErr) {
+                console.error(`[Email Background Worker] Failed to generate companion PNG for ${name}:`, imgErr);
               }
+            }
+
+            // Generate RAG chunks and embeddings so it is indexed for search
+            if (extractedText) {
+              try {
+                await processDocumentChunks(docInfo.id, extractedText);
+              } catch (chunkErr) {
+                console.error(`[Email Background Worker] Failed to generate document chunks for ${name}:`, chunkErr);
+              }
+
+              // Run the unified tax form field extractor
+              if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
+                try {
+                  await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
+                } catch (tfErr) {
+                  console.error(`[Email Background Worker] Failed to extract tax form data for ${name}:`, tfErr);
+                }
+              }
+            }
+
+            // Finally, update Client status based on the new audit state
+            const allDocsForClient = await prisma.document.findMany({
+              where: { clientId: docInfo.clientId }
             });
-            console.log(`[Email Route] Successfully created companion PNG: ${imageName}`);
+            const clientAudit = auditClientDocuments(client.taxType, allDocsForClient);
+            let nextStatus = client.status;
+            if (clientAudit.isComplete) {
+              if (client.status === 'ONBOARDING' || client.status === 'MISSING_DOCS') {
+                nextStatus = 'IN_PREPARATION';
+              }
+            } else {
+              if (client.status === 'ONBOARDING' || client.status === 'IN_PREPARATION') {
+                nextStatus = 'MISSING_DOCS';
+              }
+            }
+            if (nextStatus !== client.status) {
+              await prisma.client.update({
+                where: { id: docInfo.clientId },
+                data: { status: nextStatus }
+              });
+              client.status = nextStatus; // Keep local representation updated
+            }
+
+            console.log(`[Email Background Worker] Successfully finished processing document: ${name} (${docInfo.id})`);
+
+          } catch (docErr: any) {
+            console.error(`[Email Background Worker] Failed to process document ${docInfo.id}:`, docErr);
+            try {
+              await prisma.document.update({
+                where: { id: docInfo.id },
+                data: {
+                  status: 'REVIEW_REQUIRED',
+                  validationErrors: `Background processing failed: ${docErr.message || docErr}`
+                }
+              });
+            } catch (dbErr) {
+              console.error(`[Email Background Worker] Could not save processing failure error for ${docInfo.id}:`, dbErr);
+            }
           }
-        } catch (imgErr) {
-          console.error("Failed to generate companion PNG for email attachment:", imgErr);
         }
-      }
-
-      // Generate RAG chunks and embeddings so it is indexed for search
-      if (extractedText) {
-        try {
-          await processDocumentChunks(doc.id, extractedText);
-        } catch (chunkErr) {
-          console.error("Failed to generate document chunks for email attachment:", chunkErr);
-        }
-
-        // If the document is W2, 1099, or 1095-A, run the unified tax form field extractor
-        if (doc.category === 'W2' || doc.category.startsWith('1099') || doc.category.includes('1099') || doc.category === '1095-A' || doc.category === '1098') {
-          try {
-            await extractAndSaveTaxFormData(doc.id, doc.category, extractedText);
-          } catch (tfErr) {
-            console.error("Failed to extract tax form data for email attachment:", tfErr);
-          }
-        }
-      }
-
-      createdDocuments.push(finalDoc);
+        console.log(`[Email Background Worker] All ${createdDocumentsInfoForBg.length} attachments completed processing.`);
+      })();
     }
 
     // 3. Get all client documents to audit completeness
