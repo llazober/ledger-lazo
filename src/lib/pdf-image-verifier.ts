@@ -148,11 +148,13 @@ export async function verifyPdfDocument(pdfDocId: string, pdfBuffer: Buffer) {
                       pdfDoc.category.startsWith('1099') || 
                       pdfDoc.category.includes('1099') || 
                       pdfDoc.category === '1095-A' ||
+                      pdfDoc.category === '1098' ||
                       pdfDoc.category === 'UNCLASSIFIED' ||
                       nameLower.includes('w2') ||
                       nameLower.includes('w-2') ||
                       nameLower.includes('1099') ||
-                      nameLower.includes('1095');
+                      nameLower.includes('1095') ||
+                      nameLower.includes('1098');
     
     if (!isTaxForm) {
       console.log(`[PDF Image Verifier] Category "${pdfDoc.category}" is not a verified tax form type and name does not suggest a tax form. Skipping image validation.`);

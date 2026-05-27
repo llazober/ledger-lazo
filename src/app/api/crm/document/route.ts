@@ -454,8 +454,8 @@ Format your output as a JSON object with keys:
       }
     }
 
-    // Extract tax form fields if category is W2, 1099, or 1095-A and we have text
-    if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A') {
+    // Extract tax form fields if category is W2, 1099, 1095-A, or 1098 and we have text
+    if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
       const activeTextForForm = reprocess ? activeText : (extractedText !== undefined ? extractedText : document.extractedText);
       if (activeTextForForm) {
         try {
