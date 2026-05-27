@@ -76,6 +76,7 @@ model Document {
   confidenceScore  Float           @default(0.0)
   validationErrors String?         @db.Text // AI flagged errors (e.g. missing signature)
   fileData         String?         @db.Text // Base64 encoded file contents (for database storage)
+  humanVerified    Boolean         @default(false)
   
   chunks           DocumentChunk[]
   taxFormData      TaxFormData?

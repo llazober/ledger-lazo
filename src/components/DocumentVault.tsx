@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useTransition, useEffect } from 'react';
+import Link from 'next/link';
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 
@@ -19,6 +20,7 @@ interface Document {
   confidenceScore: number;
   validationErrors?: string | null;
   createdAt: string;
+  humanVerified?: boolean;
   taxFormData?: {
     formType: string;
     boxes: Record<string, any>;
@@ -1202,14 +1204,14 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                 </div>
               )}
 
-              {/* Document Download CTA */}
+              {/* Document Review CTA */}
               <div className="pt-2 space-y-2">
-                <button
-                  onClick={() => triggerFileDownloadWithSavePicker(activeDoc.id, activeDoc.name)}
-                  className="w-full text-xs text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center justify-center gap-2 bg-[#00f0ff]/5 py-3 rounded-xl border border-cyan-500/20 transition-all hover:scale-[1.01] uppercase tracking-wider"
+                <Link
+                  href={`/dashboard/documents/review?id=${activeDoc.id}`}
+                  className="w-full text-xs text-cyan-400 hover:text-cyan-300 font-extrabold flex items-center justify-center gap-2 bg-[#00f0ff]/5 py-3 rounded-xl border border-cyan-500/20 transition-all hover:scale-[1.01] uppercase tracking-wider block text-center"
                 >
-                  📥 Download Document
-                </button>
+                  🔍 Verify Document Data
+                </Link>
                 <button
                   onClick={handleReprocessOCR}
                   disabled={isReprocessing}
@@ -1227,39 +1229,6 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                     "🔄 Re-Run Vision OCR Fallback"
                   )}
                 </button>
-                {(() => {
-                  const nameLower = activeDoc.name.toLowerCase();
-                  const isPdf = nameLower.endsWith('.pdf');
-                  let hasTarget = isPdf;
-                  if (!isPdf) {
-                    const baseName = nameLower
-                      .replace(/\s*\(image verification.*?\)/i, '')
-                      .replace(/\.(png|jpg|jpeg)$/i, '');
-                    hasTarget = docs.some(d => 
-                      d.name.toLowerCase().startsWith(baseName) && 
-                      d.name.toLowerCase().endsWith('.pdf')
-                    );
-                  }
-                  return hasTarget && (
-                    <button
-                      onClick={handleComparePdfPng}
-                      disabled={isComparing}
-                      className="w-full text-xs text-emerald-400 hover:text-emerald-300 font-extrabold flex items-center justify-center gap-2 bg-emerald-500/10 py-3 rounded-xl border border-emerald-500/30 transition-all hover:scale-[1.01] uppercase tracking-wider disabled:opacity-50"
-                    >
-                      {isComparing ? (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Comparing PDF & PNG...
-                        </span>
-                      ) : (
-                        "🔍 Compare PDF & PNG Data"
-                      )}
-                    </button>
-                  );
-                })()}
               </div>
 
               {activeDoc.aiSummary && (

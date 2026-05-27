@@ -23,6 +23,7 @@ export default async function DocumentsPage() {
         confidenceScore: true,
         validationErrors: true,
         taxFormData: true,
+        humanVerified: true,
         createdAt: true,
         updatedAt: true
       },
@@ -100,6 +101,7 @@ export default async function DocumentsPage() {
           confidenceScore: true,
           validationErrors: true,
           taxFormData: true,
+          humanVerified: true,
           createdAt: true,
           updatedAt: true
         },
@@ -112,6 +114,7 @@ export default async function DocumentsPage() {
       extractedText: doc.extractedText || null,
       aiSummary: doc.aiSummary || null,
       validationErrors: doc.validationErrors || null,
+      humanVerified: doc.humanVerified || false,
       createdAt: doc.createdAt.toISOString(),
       taxFormData: doc.taxFormData || null
     }));
