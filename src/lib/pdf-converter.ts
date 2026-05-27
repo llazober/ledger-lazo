@@ -118,118 +118,139 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
   });
 
   const pdfDocument = await loadingTask.promise;
-  const imagesBase64: string[] = [];
+  try {
+    let pageToRender = 1;
+    let highestScore = 0;
 
-  let pageToRender = 1;
-  let highestScore = 0;
-
-  // 1. Scan all pages for OMB numbers first to find a guaranteed match
-  let detectedPage = -1;
-  let detectedCategory = "";
-  
-  for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-    try {
-      const page = await pdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
-      const clean = pageText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
-
-      // Check unique OMB control number fingerprints
-      if (clean.includes('15451380')) {
-        detectedPage = pageNum;
-        detectedCategory = '1098';
-        break;
-      }
-      if (clean.includes('15450008')) {
-        detectedPage = pageNum;
-        detectedCategory = 'W2';
-        break;
-      }
-      if (clean.includes('15450112')) {
-        detectedPage = pageNum;
-        detectedCategory = '1099-INT';
-        break;
-      }
-      if (clean.includes('15450110')) {
-        detectedPage = pageNum;
-        detectedCategory = '1099-DIV';
-        break;
-      }
-      if (clean.includes('15450119')) {
-        detectedPage = pageNum;
-        detectedCategory = '1099-R';
-        break;
-      }
-      if (clean.includes('15452232')) {
-        detectedPage = pageNum;
-        detectedCategory = '1095-A';
-        break;
-      }
-      if (clean.includes('09600616')) {
-        detectedPage = pageNum;
-        detectedCategory = '1099-SSA';
-        break;
-      }
-      if (clean.includes('15450115')) {
-        detectedPage = pageNum;
-        detectedCategory = clean.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
-        break;
-      }
-    } catch (e) {
-      // Ignored
-    }
-  }
-
-  if (detectedPage !== -1) {
-    console.log(`[PDF Converter] 100% matched Form OMB fingerprint on page ${detectedPage} -> category "${detectedCategory}"`);
-    pageToRender = detectedPage;
-  } else if (category) {
+    // 1. Scan all pages for OMB numbers first to find a guaranteed match
+    let detectedPage = -1;
+    let detectedCategory = "";
+    
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
       try {
         const page = await pdfDocument.getPage(pageNum);
         const textContent = await page.getTextContent();
         const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
+        const clean = pageText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
 
-        const score = scorePageForCategory(pageText, category);
-        console.log(`[PDF Converter] Page ${pageNum} scored ${score} for category "${category}"`);
-
-        if (score > highestScore) {
-          highestScore = score;
-          pageToRender = pageNum;
+        // Check unique OMB control number fingerprints
+        if (clean.includes('15451380')) {
+          detectedPage = pageNum;
+          detectedCategory = '1098';
+          break;
         }
-      } catch (err) {
-        console.error(`[PDF Converter] Failed to scan text for page ${pageNum}:`, err);
+        if (clean.includes('15450008')) {
+          detectedPage = pageNum;
+          detectedCategory = 'W2';
+          break;
+        }
+        if (clean.includes('15450112')) {
+          detectedPage = pageNum;
+          detectedCategory = '1099-INT';
+          break;
+        }
+        if (clean.includes('15450110')) {
+          detectedPage = pageNum;
+          detectedCategory = '1099-DIV';
+          break;
+        }
+        if (clean.includes('15450119')) {
+          detectedPage = pageNum;
+          detectedCategory = '1099-R';
+          break;
+        }
+        if (clean.includes('15452232')) {
+          detectedPage = pageNum;
+          detectedCategory = '1095-A';
+          break;
+        }
+        if (clean.includes('09600616')) {
+          detectedPage = pageNum;
+          detectedCategory = '1099-SSA';
+          break;
+        }
+        if (clean.includes('15450115')) {
+          detectedPage = pageNum;
+          detectedCategory = clean.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
+          break;
+        }
+      } catch (e) {
+        // Ignored
       }
     }
-    
-    if (highestScore > 0) {
-      console.log(`[PDF Converter] Selected Page ${pageToRender} (score: ${highestScore}) for category "${category}"`);
-    } else {
-      console.log(`[PDF Converter] No form pages matched for category "${category}". Defaulting to page 1.`);
+
+    if (detectedPage !== -1) {
+      console.log(`[PDF Converter] 100% matched Form OMB fingerprint on page ${detectedPage} -> category "${detectedCategory}"`);
+      pageToRender = detectedPage;
+    } else if (category) {
+      for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+        try {
+          const page = await pdfDocument.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ').toLowerCase();
+
+          const score = scorePageForCategory(pageText, category);
+          console.log(`[PDF Converter] Page ${pageNum} scored ${score} for category "${category}"`);
+
+          if (score > highestScore) {
+            highestScore = score;
+            pageToRender = pageNum;
+          }
+        } catch (err) {
+          console.error(`[PDF Converter] Failed to scan text for page ${pageNum}:`, err);
+        }
+      }
+      
+      if (highestScore > 0) {
+        console.log(`[PDF Converter] Selected Page ${pageToRender} (score: ${highestScore}) for category "${category}"`);
+      } else {
+        console.log(`[PDF Converter] No form pages matched for category "${category}". Defaulting to page 1.`);
+      }
     }
-  }
 
-  // If the target page was not found, we fallback to page 1.
-  try {
-    console.log(`[PDF Converter] Rendering page ${pageToRender} of ${pdfDocument.numPages} to companion PNG...`);
-    const page = await pdfDocument.getPage(pageToRender);
-    // scale: 2.0 provides 150-200 DPI visual quality, perfect for Vision OCR
-    const viewport = page.getViewport({ scale: 2.0 });
+    // If the target page was not found, we fallback to page 1.
+    try {
+      console.log(`[PDF Converter] Rendering page ${pageToRender} of ${pdfDocument.numPages} to companion PNG...`);
+      const page = await pdfDocument.getPage(pageToRender);
+      
+      // Calculate dynamic scale factor to prevent out-of-memory errors on large scanned PDFs
+      const defaultViewport = page.getViewport({ scale: 1.0 });
+      const maxDimension = Math.max(defaultViewport.width, defaultViewport.height);
+      const targetMaxDim = 1500; // Optimal resolution for Vision API and manual review
+      let scale = targetMaxDim / maxDimension;
+      if (scale > 2.0) scale = 2.0; // Cap at 2.0 to avoid unnecessary upscaling
+      if (scale < 0.8) scale = 0.8; // Set lower bound to preserve OCR readability
 
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const context = canvas.getContext('2d');
+      console.log(`[PDF Converter] Page native dimensions: ${defaultViewport.width.toFixed(1)}x${defaultViewport.height.toFixed(1)}. Selected rendering scale: ${scale.toFixed(2)} (${(defaultViewport.width * scale).toFixed(0)}x${(defaultViewport.height * scale).toFixed(0)})`);
+      const viewport = page.getViewport({ scale });
 
-    await page.render({
-      canvasContext: context as any,
-      viewport: viewport,
-      canvas: canvas as any,
-      renderInteractiveForms: true,
-    } as any).promise;
+      const canvas = createCanvas(viewport.width, viewport.height);
+      const context = canvas.getContext('2d');
 
-    const pngBuffer = canvas.toBuffer('image/png');
-    imagesBase64.push(pngBuffer.toString('base64'));
-  } catch (pageErr) {
-    console.error(`[PDF Converter] Failed to render page ${pageToRender}:`, pageErr);
+      await page.render({
+        canvasContext: context as any,
+        viewport: viewport,
+        canvas: canvas as any,
+        renderInteractiveForms: true,
+      } as any).promise;
+
+      const pngBuffer = canvas.toBuffer('image/png');
+      imagesBase64.push(pngBuffer.toString('base64'));
+
+      // Clean up local variables immediately to aid V8 garbage collection
+      (canvas as any) = null;
+      (context as any) = null;
+      (page as any) = null;
+    } catch (pageErr) {
+      console.error(`[PDF Converter] Failed to render page ${pageToRender}:`, pageErr);
+    }
+  } finally {
+    try {
+      await pdfDocument.destroy();
+      console.log(`[PDF Converter] Successfully destroyed pdfDocument instance to release native memory.`);
+    } catch (destroyErr) {
+      console.error("[PDF Converter] Error destroying pdfDocument:", destroyErr);
+    }
   }
 
   return imagesBase64;
