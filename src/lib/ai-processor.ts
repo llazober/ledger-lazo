@@ -394,3 +394,40 @@ ${jsonSchemaKeysDescription}`;
     return { success: false, error: errorMessage };
   }
 }
+
+/**
+ * Helper to extract tax year from raw OCR text using regex patterns
+ */
+export function extractTaxYear(text: string | null | undefined, defaultYear: number = new Date().getFullYear() - 1): number {
+  if (!text) return defaultYear;
+  
+  // Clean whitespace
+  const clean = text.replace(/\s+/g, ' ');
+  
+  // 1. Try to find a year next to OMB number or standard IRS tax form indicators
+  // Look for 4-digit years between 2018 and 2030 near form indicators
+  const formYearMatch = clean.match(/(?:form\s+w\-2|1099\-[a-z]+|1095\-a|1098)[^0-9]{0,50}(201[8-9]|202[0-9]|203[0-9])/i);
+  if (formYearMatch && formYearMatch[1]) {
+    return parseInt(formYearMatch[1]);
+  }
+  
+  // 2. Look for year near OMB number patterns
+  const ombMatch = clean.match(/omb\s+no\.[^0-9]*\d{4,8}[^0-9]{0,50}(201[8-9]|202[0-9]|203[0-9])/i);
+  if (ombMatch && ombMatch[1]) {
+    return parseInt(ombMatch[1]);
+  }
+
+  // 3. Look for phrases like "tax year 202X" or "for calendar year 202X" or "for year 202X"
+  const phraseMatch = clean.match(/(?:tax\s+year|calendar\s+year|for\s+year|statement\s+for|statement\s+year)\s*[^0-9]{0,20}\b(201[8-9]|202[0-9]|203[0-9])\b/i);
+  if (phraseMatch && phraseMatch[1]) {
+    return parseInt(phraseMatch[1]);
+  }
+  
+  // 4. Fallback: Search for any year in the text
+  const yearMatches = clean.match(/\b(201[8-9]|202[0-9]|203[0-9])\b/g);
+  if (yearMatches && yearMatches.length > 0) {
+    return parseInt(yearMatches[0]);
+  }
+  
+  return defaultYear;
+}

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { openai } from '@/lib/openai';
 import mammoth from 'mammoth';
-import { processDocumentChunks, extractAndSaveTaxFormData } from '@/lib/ai-processor';
+import { processDocumentChunks, extractAndSaveTaxFormData, extractTaxYear } from '@/lib/ai-processor';
 
 export async function POST(req: Request) {
   try {
@@ -28,6 +28,17 @@ export async function POST(req: Request) {
     let aiSummary = clientAiSummary || null;
     let confidenceScore = clientConfidenceScore || 0.0;
     let validationErrors = clientValidationErrors || null;
+
+    let clientTaxYear = new Date().getFullYear() - 1;
+    if (clientId) {
+      const clientRecord = await prisma.client.findUnique({
+        where: { id: clientId }
+      });
+      if (clientRecord) {
+        clientTaxYear = clientRecord.taxYear;
+      }
+    }
+    let docTaxYear = clientTaxYear;
 
     if (fileData) {
       const fileBuffer = Buffer.from(fileData, 'base64');
@@ -154,9 +165,10 @@ Your task:
 3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
 5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${clientTaxYear}.
 
 Format your output as a JSON object with keys:
-"category", "aiSummary", "confidenceScore", "validationErrors"`;
+"category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
 
             const response = await openai.chat.completions.create({
               model: 'gpt-4o-mini',
@@ -167,6 +179,14 @@ Format your output as a JSON object with keys:
             const result = JSON.parse(response.choices[0].message?.content || '{}');
             category = result.category || category;
             confidenceScore = result.confidenceScore || confidenceScore;
+
+            // Extract and validate taxYear
+            let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+            if (parsedYear && !isNaN(parsedYear)) {
+              docTaxYear = parsedYear;
+            } else {
+              docTaxYear = extractTaxYear(rawText, clientTaxYear);
+            }
 
             if (isLikelyScannedPdf && !visionOcrSucceeded) {
               // Vision OCR failed — add a note so the accountant knows to re-upload as PNG/JPG
@@ -180,6 +200,8 @@ Format your output as a JSON object with keys:
           } catch (openaiErr) {
             console.error("OpenAI processing of raw text failed:", openaiErr);
           }
+        } else {
+          docTaxYear = extractTaxYear(rawText, clientTaxYear);
         }
       }
     }
@@ -273,9 +295,10 @@ Your task:
 3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
 5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${clientTaxYear}.
 
 Format your output as a JSON object with keys:
-"category", "aiSummary", "confidenceScore", "validationErrors"`;
+"category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
 
               const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
@@ -288,9 +311,19 @@ Format your output as a JSON object with keys:
               pngAiSummary = result.aiSummary || pngAiSummary;
               pngConfidenceScore = result.confidenceScore || pngConfidenceScore;
               pngValidationErrors = result.validationErrors || null;
+
+              // Extract and validate taxYear
+              let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+              if (parsedYear && !isNaN(parsedYear)) {
+                docTaxYear = parsedYear;
+              } else {
+                docTaxYear = extractTaxYear(pngText, clientTaxYear);
+              }
             } catch (openaiErr) {
               console.error("[Document Route] OpenAI processing of PNG text failed:", openaiErr);
             }
+          } else if (pngText) {
+            docTaxYear = extractTaxYear(pngText, clientTaxYear);
           }
 
           // 3. Check for OMB fingerprint override on PNG text
@@ -323,7 +356,7 @@ Format your output as a JSON object with keys:
               url: '#',
               fileSize: fileSize,
               fileType: fileType,
-              taxYear: 2026,
+              taxYear: docTaxYear,
               category: category,
               status: pdfStatus,
               extractedText: extractedText || null,
@@ -343,7 +376,7 @@ Format your output as a JSON object with keys:
               url: '#',
               fileSize: Math.round(imageBase64.length * 0.75),
               fileType: 'PNG',
-              taxYear: 2026,
+              taxYear: docTaxYear,
               category: pngCategory,
               status: pngStatus,
               extractedText: pngText || null,
@@ -385,7 +418,7 @@ Format your output as a JSON object with keys:
             url: '#',
             fileSize,
             fileType,
-            taxYear: 2026,
+            taxYear: docTaxYear,
             category,
             status: (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED',
             extractedText,
@@ -407,7 +440,7 @@ Format your output as a JSON object with keys:
           url: '#',
           fileSize,
           fileType,
-          taxYear: 2026,
+          taxYear: docTaxYear,
           category,
           status: (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED',
           extractedText,
@@ -468,6 +501,7 @@ export async function PATCH(req: Request) {
     let confidenceScore = existingDoc.confidenceScore || 0.0;
     let validationErrors = existingDoc.validationErrors || null;
     let status = existingDoc.status;
+    let reprocessTaxYear = existingDoc.taxYear;
 
     if (reprocess) {
       console.log(`[Reprocess] Triggering Vision OCR re-extraction for document ${docId}...`);
@@ -553,9 +587,10 @@ Your task:
 3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
 4. Estimate your parsing confidence score between 0.0 and 1.0.
 5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${existingDoc.taxYear}.
 
 Format your output as a JSON object with keys:
-"category", "aiSummary", "confidenceScore", "validationErrors"`;
+"category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
 
             const response = await openai.chat.completions.create({
               model: 'gpt-4o-mini',
@@ -567,11 +602,20 @@ Format your output as a JSON object with keys:
             activeCategory = result.category || activeCategory;
             activeSummary = result.aiSummary || activeSummary;
             confidenceScore = result.confidenceScore || confidenceScore;
-             validationErrors = result.validationErrors || null;
-             status = (validationErrors || activeCategory === 'UNCLASSIFIED' || activeCategory === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+            validationErrors = result.validationErrors || null;
+            status = (validationErrors || activeCategory === 'UNCLASSIFIED' || activeCategory === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+
+            let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+            if (parsedYear && !isNaN(parsedYear)) {
+              reprocessTaxYear = parsedYear;
+            } else {
+              reprocessTaxYear = extractTaxYear(rawText, existingDoc.taxYear);
+            }
           } catch (openaiErr) {
             console.error("[Reprocess] OpenAI processing of raw text failed:", openaiErr);
           }
+        } else {
+          reprocessTaxYear = extractTaxYear(rawText, existingDoc.taxYear);
         }
       } else {
         return NextResponse.json({ success: false, error: "Vision OCR could not transcribe text from document image data." }, { status: 422 });
@@ -588,7 +632,8 @@ Format your output as a JSON object with keys:
           aiSummary: activeSummary,
           confidenceScore,
           validationErrors,
-          status
+          status,
+          taxYear: reprocessTaxYear
         }
       });
     } else {

@@ -11,6 +11,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "clientId and file are required" }, { status: 400 });
     }
 
+    // Load Client first to get client's taxYear
+    const clientRecord = await prisma.client.findUnique({
+      where: { id: clientId }
+    });
+    const clientTaxYear = clientRecord?.taxYear ?? (new Date().getFullYear() - 1);
+
     // Convert file to base64 string
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -24,7 +30,7 @@ export async function POST(req: Request) {
         url: '#', // Will update after creation with the safe download URL
         fileType: 'PDF',
         fileSize: file.size,
-        taxYear: 2026,
+        taxYear: clientTaxYear,
         category: 'Tax_Return',
         status: 'VALIDATED',
         extractedText: `Final prepared tax return for review. Uploaded by CPA preparer. Size: ${(file.size / 1024).toFixed(1)} KB.`,
