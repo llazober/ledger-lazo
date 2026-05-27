@@ -334,23 +334,6 @@ Format your output as a JSON object with keys:
             }
           });
 
-          // 5. Generate RAG chunks and extract tax data for PDF Document
-          if (extractedText) {
-            try {
-              await processDocumentChunks(pdfDocument.id, extractedText);
-            } catch (chunkErr) {
-              console.error("Failed to generate document chunks for PDF:", chunkErr);
-            }
-
-            if (pdfDocument.category === 'W2' || pdfDocument.category.startsWith('1099') || pdfDocument.category.includes('1099') || pdfDocument.category === '1095-A' || pdfDocument.category === '1098') {
-              try {
-                await extractAndSaveTaxFormData(pdfDocument.id, pdfDocument.category, extractedText);
-              } catch (tfErr) {
-                console.error("Failed to extract tax form data for PDF:", tfErr);
-              }
-            }
-          }
-
           // 6. Save PNG Document in DB
           const pngStatus = (pngValidationErrors || pngCategory === 'UNCLASSIFIED' || pngCategory === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
           const pngDocument = await prisma.document.create({
