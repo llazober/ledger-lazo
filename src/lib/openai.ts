@@ -7,11 +7,13 @@ const getOpenAIClient = () => {
   if (!apiKey && process.env.NODE_ENV === 'production') {
     return new OpenAI({
       apiKey: 'dummy_key_for_build_time',
+      timeout: 15000,
     });
   }
 
   return new OpenAI({
     apiKey: apiKey || 'missing_api_key',
+    timeout: 15000,
   });
 };
 
