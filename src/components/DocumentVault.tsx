@@ -328,6 +328,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const [isDragging, setIsDragging] = useState(false);
   const [activeDoc, setActiveDoc] = useState<Document | null>(initialDocs[0] || null);
   const [selectedVaultDocs, setSelectedVaultDocs] = useState<string[]>([]);
+  const [showPdfFiles, setShowPdfFiles] = useState(false);
 
   // States for manual OCR editing
   const [editedCategory, setEditedCategory] = useState('');
@@ -622,10 +623,10 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     });
   };
 
-  // Filter docs based on client selection
-  const filteredDocs = selectedClientId
-    ? docs.filter(d => d.clientId === selectedClientId)
-    : docs;
+  // Filter docs based on client selection and PDF visibility toggle
+  const filteredDocs = docs
+    .filter(d => !selectedClientId || d.clientId === selectedClientId)
+    .filter(d => showPdfFiles || !(d.name.toLowerCase().endsWith('.pdf') || d.fileType === 'PDF'));
 
   // Stats
   const totalDocs = filteredDocs.length;
@@ -1001,21 +1002,36 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                 )}
               </div>
 
-              {/* Client Filter Dropdown */}
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-500 font-bold uppercase">Filter Client:</span>
-                <select
-                  value={selectedClientId}
-                  onChange={(e) => setSelectedClientId(e.target.value)}
-                  className="bg-[#0f0f12] border border-white/10 focus:border-[#00f0ff] focus:outline-none rounded-lg text-slate-300 text-xs px-2 py-1 font-semibold transition-all"
-                >
-                  <option value="">All Clients</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.taxType})
-                    </option>
-                  ))}
-                </select>
+              {/* Controls */}
+              <div className="flex items-center gap-3">
+                {/* PDF Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-300 bg-[#0f0f12] border border-white/10 px-2 py-1.5 rounded-lg hover:border-[#00f0ff]/30 transition-all select-none">
+                  <input
+                    type="checkbox"
+                    id="show-pdf-toggle"
+                    checked={showPdfFiles}
+                    onChange={(e) => setShowPdfFiles(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer"
+                  />
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">Show Original PDFs</span>
+                </label>
+
+                {/* Client Filter Dropdown */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">Filter Client:</span>
+                  <select
+                    value={selectedClientId}
+                    onChange={(e) => setSelectedClientId(e.target.value)}
+                    className="bg-[#0f0f12] border border-white/10 focus:border-[#00f0ff] focus:outline-none rounded-lg text-slate-300 text-xs px-2 py-1.5 font-semibold transition-all"
+                  >
+                    <option value="">All Clients</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.taxType})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 

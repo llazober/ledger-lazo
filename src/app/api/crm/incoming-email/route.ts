@@ -536,36 +536,117 @@ Format your output as a JSON object with keys:
               }
             }
 
-            const finalStatus = (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
-
-            // Update main document in database
-            await prisma.document.update({
-              where: { id: docInfo.id },
-              data: {
-                category,
-                status: finalStatus,
-                extractedText: extractedText || null,
-                aiSummary,
-                confidenceScore,
-                validationErrors
-              }
-            });
-
-            // Convert PDF pages to companion PNG image documents for manual review
             const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+
             if (isPdf && finalBase64) {
               try {
                 console.log(`[Email Background Worker] Converting PDF attachment ${name} to PNG for manual verification...`);
                 const { convertPdfToImages } = await import('@/lib/pdf-converter');
                 const fileBuffer = Buffer.from(finalBase64, 'base64');
                 const pagesBase64 = await convertPdfToImages(fileBuffer, 4, category);
-                for (let i = 0; i < pagesBase64.length; i++) {
-                  const imageBase64 = pagesBase64[i];
-                  const imageName = pagesBase64.length === 1
-                    ? `${name.replace(/\.pdf$/i, '')} (Image Verification).png`
-                    : `${name.replace(/\.pdf$/i, '')} (Image Verification - Page ${i + 1}).png`;
-                  
-                  await prisma.document.create({
+
+                if (pagesBase64.length > 0) {
+                  const imageBase64 = pagesBase64[0];
+                  const imageName = `${name.replace(/\.pdf$/i, '')} (Image Verification).png`;
+
+                  let pngText = '';
+                  let pngCategory = category;
+                  let pngAiSummary = aiSummary;
+                  let pngConfidenceScore = confidenceScore;
+                  let pngValidationErrors = validationErrors;
+
+                  // 1. Run high-fidelity Vision OCR on the companion image
+                  if (process.env.OPENAI_API_KEY) {
+                    try {
+                      console.log(`[Email Background Worker] Running high-fidelity Vision OCR on converted PNG...`);
+                      const visionResponse = await openai.chat.completions.create({
+                        model: 'gpt-4o',
+                        messages: [{
+                          role: 'user',
+                          content: [
+                            {
+                              type: 'text',
+                              text: 'Transcribe ALL visible text from the following document image. Perform high-fidelity OCR, preserving all headers, forms, labels, tables, key-value pairs, numbers, boxes, and identifiers exactly as printed.'
+                            },
+                            {
+                              type: 'image_url',
+                              image_url: {
+                                url: `data:image/png;base64,${imageBase64}`
+                      }
+                    }
+                  ]
+                }],
+                max_tokens: 4000
+              });
+
+                      pngText = visionResponse.choices[0].message?.content || '';
+                    } catch (visionErr) {
+                      console.error("[Email Background Worker] Vision OCR on PNG failed, falling back to PDF extracted text:", visionErr);
+                      pngText = extractedText || '';
+                    }
+                  }
+
+                  // 2. Classify PNG text using OpenAI
+                  if (pngText && process.env.OPENAI_API_KEY) {
+                    try {
+                      const currentYear = new Date().getFullYear();
+                      const previousYear = currentYear - 1;
+                      const prompt = `You are an expert CPA Tax Assistant.
+Analyze the following raw OCR text extracted from an uploaded client document:
+---
+${pngText}
+---
+
+Your task:
+1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+4. Estimate your parsing confidence score between 0.0 and 1.0.
+5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+
+Format your output as a JSON object with keys:
+"category", "aiSummary", "confidenceScore", "validationErrors"`;
+
+                      const response = await openai.chat.completions.create({
+                        model: 'gpt-4o-mini',
+                        messages: [{ role: 'user', content: prompt }],
+                        response_format: { type: "json_object" }
+                      });
+
+                      const result = JSON.parse(response.choices[0].message?.content || '{}');
+                      pngCategory = result.category || pngCategory;
+                      pngAiSummary = result.aiSummary || pngAiSummary;
+                      pngConfidenceScore = result.confidenceScore || pngConfidenceScore;
+                      pngValidationErrors = result.validationErrors || null;
+                    } catch (openaiErr) {
+                      console.error("[Email Background Worker] OpenAI processing of PNG text failed:", openaiErr);
+                    }
+                  }
+
+                  // 3. Check for OMB fingerprint override on PNG text
+                  if (pngText) {
+                    const cleanTextForOMB = pngText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
+                    let detectedCategory: string | null = null;
+                    if (cleanTextForOMB.includes('15451380')) detectedCategory = '1098';
+                    else if (cleanTextForOMB.includes('15450008')) detectedCategory = 'W2';
+                    else if (cleanTextForOMB.includes('15450112')) detectedCategory = '1099-INT';
+                    else if (cleanTextForOMB.includes('15450110')) detectedCategory = '1099-DIV';
+                    else if (cleanTextForOMB.includes('15450119')) detectedCategory = '1099-R';
+                    else if (cleanTextForOMB.includes('15452232')) detectedCategory = '1095-A';
+                    else if (cleanTextForOMB.includes('09600616')) detectedCategory = '1099-SSA';
+                    else if (cleanTextForOMB.includes('15450115')) {
+                      detectedCategory = cleanTextForOMB.includes('nonemployee') ? '1099-NEC' : '1099-MISC';
+                    }
+
+                    if (detectedCategory) {
+                      console.log(`[Email Background Worker] OMB fingerprint matched on PNG: ${detectedCategory}. Overriding category.`);
+                      pngCategory = detectedCategory;
+                    }
+                  }
+
+                  // 4. Save PNG Document in DB
+                  const pngStatus = (pngValidationErrors || pngCategory === 'UNCLASSIFIED' || pngCategory === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+                  const pngDocument = await prisma.document.create({
                     data: {
                       clientId: docInfo.clientId,
                       name: imageName,
@@ -573,32 +654,126 @@ Format your output as a JSON object with keys:
                       fileSize: Math.round(imageBase64.length * 0.75),
                       fileType: 'PNG',
                       taxYear: 2026,
-                      category: 'UNCLASSIFIED',
-                      status: 'UPLOADED',
-                      fileData: imageBase64,
+                      category: pngCategory,
+                      status: pngStatus,
+                      extractedText: pngText || null,
+                      aiSummary: pngAiSummary,
+                      confidenceScore: pngConfidenceScore,
+                      validationErrors: pngValidationErrors,
+                      fileData: imageBase64
                     }
                   });
-                  console.log(`[Email Background Worker] Successfully created companion PNG: ${imageName}`);
+
+                  // 5. Generate RAG chunks for PNG Document
+                  if (pngText) {
+                    try {
+                      await processDocumentChunks(pngDocument.id, pngText);
+                    } catch (chunkErr) {
+                      console.error("Failed to generate document chunks for PNG:", chunkErr);
+                    }
+
+                    // Extract tax form fields if category matches
+                    if (pngDocument.category === 'W2' || pngDocument.category.startsWith('1099') || pngDocument.category.includes('1099') || pngDocument.category === '1095-A' || pngDocument.category === '1098') {
+                      try {
+                        await extractAndSaveTaxFormData(pngDocument.id, pngDocument.category, pngText);
+                      } catch (tfErr) {
+                        console.error("Failed to extract tax form data for PNG:", tfErr);
+                      }
+                    }
+                  }
+
+                  // 6. Update original PDF document in database (retaining it)
+                  const finalStatus = (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+                  await prisma.document.update({
+                    where: { id: docInfo.id },
+                    data: {
+                      category,
+                      status: finalStatus,
+                      extractedText: extractedText || null,
+                      aiSummary,
+                      confidenceScore,
+                      validationErrors
+                    }
+                  });
+
+                  if (extractedText) {
+                    try {
+                      await processDocumentChunks(docInfo.id, extractedText);
+                    } catch (chunkErr) {
+                      console.error("Failed to generate document chunks for PDF:", chunkErr);
+                    }
+                    if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
+                      try {
+                        await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
+                      } catch (tfErr) {
+                        console.error("Failed to extract tax form data for PDF:", tfErr);
+                      }
+                    }
+                  }
+                  console.log(`[Email Background Worker] Updated PDF document ${docInfo.id} with final details.`);
+                } else {
+                  throw new Error("No pages rendered from PDF");
                 }
-              } catch (imgErr) {
-                console.error(`[Email Background Worker] Failed to generate companion PNG for ${name}:`, imgErr);
-              }
-            }
+              } catch (pdfToPngErr) {
+                console.error("[Email Background Worker] PDF to PNG workflow failed, falling back to updating PDF document:", pdfToPngErr);
+                // Fallback: update original PDF document in DB
+                const finalStatus = (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+                await prisma.document.update({
+                  where: { id: docInfo.id },
+                  data: {
+                    category,
+                    status: finalStatus,
+                    extractedText: extractedText || null,
+                    aiSummary,
+                    confidenceScore,
+                    validationErrors
+                  }
+                });
 
-            // Generate RAG chunks and embeddings so it is indexed for search
-            if (extractedText) {
-              try {
-                await processDocumentChunks(docInfo.id, extractedText);
-              } catch (chunkErr) {
-                console.error(`[Email Background Worker] Failed to generate document chunks for ${name}:`, chunkErr);
-              }
+                if (extractedText) {
+                  try {
+                    await processDocumentChunks(docInfo.id, extractedText);
+                  } catch (chunkErr) {
+                    console.error("Failed to generate document chunks on fallback PDF:", chunkErr);
+                  }
 
-              // Run the unified tax form field extractor
-              if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
+                  if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
+                    try {
+                      await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
+                    } catch (tfErr) {
+                      console.error("Failed to extract tax form data on fallback PDF:", tfErr);
+                    }
+                  }
+                }
+              }
+            } else {
+              // Non-PDF flow (same as original)
+              const finalStatus = (validationErrors || category === 'UNCLASSIFIED' || category === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+              await prisma.document.update({
+                where: { id: docInfo.id },
+                data: {
+                  category,
+                  status: finalStatus,
+                  extractedText: extractedText || null,
+                  aiSummary,
+                  confidenceScore,
+                  validationErrors
+                }
+              });
+
+              if (extractedText) {
                 try {
-                  await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
-                } catch (tfErr) {
-                  console.error(`[Email Background Worker] Failed to extract tax form data for ${name}:`, tfErr);
+                  await processDocumentChunks(docInfo.id, extractedText);
+                } catch (chunkErr) {
+                  console.error(`[Email Background Worker] Failed to generate document chunks for ${name}:`, chunkErr);
+                }
+
+                if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
+                  try {
+                    await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
+                  } catch (tfErr) {
+                    console.error(`[Email Background Worker] Failed to extract tax form data for ${name}:`, tfErr);
+                  }
                 }
               }
             }
