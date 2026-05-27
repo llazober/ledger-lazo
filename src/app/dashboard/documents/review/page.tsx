@@ -78,7 +78,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
   };
 
   return (
-    <div className="bg-transparent text-slate-100 p-6 lg:p-8">
+    <div className="bg-[#090e18] text-slate-100 p-6 lg:p-8 min-h-screen border-l border-white/5">
       <div className="max-w-[1600px] mx-auto space-y-6">
         {/* Back Link and Header */}
         <div className="flex items-center justify-between border-b border-white/5 pb-4">

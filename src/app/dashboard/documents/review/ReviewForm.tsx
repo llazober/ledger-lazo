@@ -143,6 +143,7 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
   });
 
   const [humanVerified, setHumanVerified] = useState(initialDoc.humanVerified);
+  const [taxYear, setTaxYear] = useState(initialDoc.taxYear);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -157,7 +158,7 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
     setSaving(true);
     setStatus(null);
     try {
-      const response = await fetch('/api/crm/document', {
+      const response = await fetch('/accounting/api/crm/document', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -165,7 +166,8 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
         body: JSON.stringify({
           documentId: initialDoc.id,
           boxes,
-          humanVerified
+          humanVerified,
+          taxYear
         })
       });
 
@@ -201,7 +203,7 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
               {initialDoc.category} Form Fields
             </span>
             <span className="text-[10px] text-slate-400 font-bold">
-              Tax Year: {initialDoc.taxYear}
+              Tax Year: {taxYear}
             </span>
           </div>
 
@@ -211,11 +213,37 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
 
           <div className="space-y-4 pt-2">
             {fields.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-6">
-                No extracted fields available for this document category.
-              </p>
+              <div className="space-y-3">
+                <div className="flex flex-col space-y-1">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">
+                    Tax Year
+                  </label>
+                  <input
+                    type="number"
+                    value={taxYear}
+                    onChange={(e) => setTaxYear(Number(e.target.value))}
+                    className="w-full bg-[#0a0a0c] border border-white/10 hover:border-white/20 focus:border-cyan-500/50 rounded-xl py-2.5 px-3 text-white font-mono text-xs transition-all focus:outline-none focus:ring-0"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 text-center py-6">
+                  No extracted fields available for this document category.
+                </p>
+              </div>
             ) : (
               <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {/* Editable Tax Year Field */}
+                <div className="flex flex-col space-y-1">
+                  <label className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wide">
+                    Tax Year
+                  </label>
+                  <input
+                    type="number"
+                    value={taxYear}
+                    onChange={(e) => setTaxYear(Number(e.target.value))}
+                    className="w-full bg-[#0a0a0c] border border-white/10 hover:border-white/20 focus:border-cyan-500/50 rounded-xl py-2.5 px-3 text-white font-mono text-xs transition-all focus:outline-none focus:ring-0"
+                  />
+                </div>
+
                 {fields.map((field) => {
                   const val = boxes[field.key];
                   return (

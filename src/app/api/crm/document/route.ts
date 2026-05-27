@@ -668,7 +668,7 @@ export async function DELETE(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const { documentId, boxes, humanVerified } = await req.json();
+    const { documentId, boxes, humanVerified, taxYear } = await req.json();
 
     if (!documentId) {
       return NextResponse.json({ error: 'documentId is required' }, { status: 400 });
@@ -689,6 +689,7 @@ export async function PUT(req: Request) {
       data: {
         humanVerified: !!humanVerified,
         status: humanVerified ? 'VALIDATED' : document.status,
+        taxYear: taxYear !== undefined ? Number(taxYear) : document.taxYear,
       },
     });
 
