@@ -105,6 +105,10 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
 
   // Dynamically import pdfjs-dist legacy ESM build for compatibility in Node environments
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  
+  // Configure PDF.js worker explicitly for Node/Next environment
+  const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
 
   const standardFontDataUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts') + '/';
   const cMapUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps') + '/';

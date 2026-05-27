@@ -384,13 +384,14 @@ export async function POST(req: Request) {
             const attachmentExtension = docInfo.attachmentExtension;
             const name = docInfo.name;
 
+            const fileExt = attachmentExtension || '';
+            const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
+            const isDocx = ['docx', 'doc'].includes(fileExt) || name?.toLowerCase().endsWith('.docx') || name?.toLowerCase().endsWith('.doc');
+            const isTxt = fileExt === 'txt' || name?.toLowerCase().endsWith('.txt');
+            const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif'].includes(fileExt) ||
+                            /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(name || '');
+
             if (finalBase64) {
-              const fileExt = attachmentExtension || '';
-              const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
-              const isDocx = ['docx', 'doc'].includes(fileExt) || name?.toLowerCase().endsWith('.docx') || name?.toLowerCase().endsWith('.doc');
-              const isTxt = fileExt === 'txt' || name?.toLowerCase().endsWith('.txt');
-              const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic', 'heif'].includes(fileExt) ||
-                              /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(name || '');
 
               if (isTxt) {
                 try {
@@ -612,8 +613,6 @@ export async function POST(req: Request) {
               */
               detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
             }
-
-            const isPdf = attachmentExtension === 'pdf' || name?.toLowerCase().endsWith('.pdf');
 
             if (isPdf && finalBase64) {
               try {
