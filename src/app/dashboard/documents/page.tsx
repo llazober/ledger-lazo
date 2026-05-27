@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { prisma } from '@/lib/prisma';
 import DocumentVault from '@/components/DocumentVault';
 
@@ -128,10 +128,12 @@ export default async function DocumentsPage() {
 
     return (
       <DashboardWrapper>
-        <DocumentVault 
-          initialDocs={serializedDocs} 
-          clients={serializedClients}
-        />
+        <Suspense fallback={<div className="p-8 text-xs text-slate-500 uppercase tracking-widest animate-pulse">Loading Document Vault...</div>}>
+          <DocumentVault 
+            initialDocs={serializedDocs} 
+            clients={serializedClients}
+          />
+        </Suspense>
       </DashboardWrapper>
     );
   } catch (error) {

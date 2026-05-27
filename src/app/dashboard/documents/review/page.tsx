@@ -1,6 +1,7 @@
 import React from 'react';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import ReviewForm from './ReviewForm';
 
 export const dynamic = 'force-dynamic';
@@ -42,12 +43,12 @@ export default async function ReviewPage({ searchParams }: PageProps) {
         <p className="text-slate-400 text-xs max-w-sm mx-auto leading-relaxed">
           The requested document ID `{id}` does not exist or has been deleted from the system.
         </p>
-        <a
+        <Link
           href="/dashboard/documents"
           className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-lg text-xs font-semibold uppercase tracking-wider transition-all"
         >
           Back to Vault
-        </a>
+        </Link>
       </div>
     );
   }
@@ -84,9 +85,9 @@ export default async function ReviewPage({ searchParams }: PageProps) {
         <div className="flex items-center justify-between border-b border-white/5 pb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs text-cyan-400 hover:text-cyan-300 font-medium">
-              <a href="/dashboard/documents" className="flex items-center gap-1">
+              <Link href={`/dashboard/documents?selectedId=${serializedDoc.id}`} className="flex items-center gap-1">
                 <span>&larr;</span> Back to Document Vault
-              </a>
+              </Link>
             </div>
             <h1 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
               Review & Verify Document

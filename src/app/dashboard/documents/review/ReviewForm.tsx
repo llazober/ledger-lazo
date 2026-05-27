@@ -181,7 +181,7 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
       
       // Delay navigation slightly to let the user see the success state
       setTimeout(() => {
-        router.push('/dashboard/documents');
+        router.push(`/dashboard/documents?selectedId=${initialDoc.id}`);
         router.refresh();
       }, 1000);
 
@@ -321,11 +321,8 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
             <button
               type="button"
               onClick={() => {
-                if (window.history.length > 1) {
-                  router.back();
-                } else {
-                  router.push('/dashboard/documents');
-                }
+                router.push(`/dashboard/documents?selectedId=${initialDoc.id}`);
+                router.refresh();
               }}
               className="flex-1 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs tracking-wider uppercase py-3 rounded-xl border border-white/10 transition-all text-center"
             >

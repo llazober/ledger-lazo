@@ -4,6 +4,7 @@ import React, { useState, useTransition, useEffect } from 'react';
 import Link from 'next/link';
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
+import { useSearchParams } from 'next/navigation';
 
 interface Document {
   id: string;
@@ -331,6 +332,18 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const [activeDoc, setActiveDoc] = useState<Document | null>(initialDocs[0] || null);
   const [selectedVaultDocs, setSelectedVaultDocs] = useState<string[]>([]);
   const [showPdfFiles, setShowPdfFiles] = useState(false);
+
+  const searchParams = useSearchParams();
+  const selectedId = searchParams.get('selectedId');
+
+  useEffect(() => {
+    if (selectedId) {
+      const doc = docs.find(d => d.id === selectedId);
+      if (doc) {
+        setActiveDoc(doc);
+      }
+    }
+  }, [selectedId, docs]);
 
   // States for manual OCR editing
   const [editedCategory, setEditedCategory] = useState('');
