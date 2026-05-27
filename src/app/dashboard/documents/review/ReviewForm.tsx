@@ -157,8 +157,8 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
     setSaving(true);
     setStatus(null);
     try {
-      const response = await fetch('/api/crm/document/verify', {
-        method: 'POST',
+      const response = await fetch('/api/crm/document', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -290,12 +290,19 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
 
           {/* Action CTAs */}
           <div className="pt-2 flex gap-3">
-            <a
-              href="/dashboard/documents"
+            <button
+              type="button"
+              onClick={() => {
+                if (window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push('/dashboard/documents');
+                }
+              }}
               className="flex-1 bg-white/5 hover:bg-white/10 text-white font-extrabold text-xs tracking-wider uppercase py-3 rounded-xl border border-white/10 transition-all text-center"
             >
               Cancel
-            </a>
+            </button>
             <button
               onClick={handleSave}
               disabled={saving}
