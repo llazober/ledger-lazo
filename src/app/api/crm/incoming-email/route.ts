@@ -5,6 +5,24 @@ import { auditClientDocuments } from '@/lib/taxRules';
 import { PDFDocument } from 'pdf-lib';
 import { processDocumentChunks, extractAndSaveTaxFormData, extractTaxYear } from '@/lib/ai-processor';
 
+const DIRECT_VISION_CLASSIFIER_PROMPT = `
+You are an expert tax document classifier. Analyze the provided document image.
+1. Identify the official IRS Form number or document type (e.g. "W2", "1099-NEC", "1099-MISC", "1099-INT", "1099-DIV", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", or "UNCLASSIFIED" if it's not one of these).
+2. Locate the Tax Year (e.g. 2025, 2024). If not found, return null.
+3. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+4. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2024 or 2025, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+5. Estimate your classification confidence score between 0.0 and 1.0.
+
+Return a JSON object with this exact structure:
+{
+  "category": "string",
+  "taxYear": number or null,
+  "aiSummary": "string",
+  "validationErrors": "string" or null,
+  "confidenceScore": number
+}
+`;
+
 // Dynamic document classifier using OpenAI GPT-4o-mini (falls back to regex rules)
 async function classifyDocumentWithAI(
   filename: string,
@@ -496,56 +514,102 @@ export async function POST(req: Request) {
               category = detectedCategory;
             }
 
-            // Confirm/refine category if vague using extracted OCR text
+            // Confirm/refine category using direct vision classification for images, or fallback for text docs
             let detectedTaxYear = client.taxYear;
-            if (extractedText && (category === 'UNCLASSIFIED' || category.startsWith('1099') || category === 'W2' || category === '1098' || category === '1095-A')) {
+            const hasOpenAI = process.env.OPENAI_API_KEY && 
+                              process.env.OPENAI_API_KEY !== 'missing_api_key' &&
+                              process.env.OPENAI_API_KEY !== 'dummy_key_for_build_time';
+
+            if (hasOpenAI && isImage && finalBase64) {
               try {
-                console.log(`[Email Background Worker] Confirming/refining category (${category}) based on OCR text...`);
-                const currentYear = new Date().getFullYear();
-                const previousYear = currentYear - 1;
-                const prompt = `You are an expert CPA Tax Assistant.
-Analyze the following raw OCR text extracted from an uploaded client document:
----
-${extractedText}
----
-
-Your task:
-1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
-2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
-3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
-4. Estimate your parsing confidence score between 0.0 and 1.0.
-5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
-6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${client.taxYear}.
-
-Format your output as a JSON object with keys:
-"category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
-
+                console.log(`[Email Background Worker] Running direct vision classification for uploaded image...`);
                 const response = await openai.chat.completions.create({
-                  model: 'gpt-4o-mini',
-                  messages: [{ role: 'user', content: prompt }],
+                  model: 'gpt-4o',
+                  messages: [{
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: DIRECT_VISION_CLASSIFIER_PROMPT },
+                      {
+                        type: 'image_url',
+                        image_url: {
+                          url: `data:image/${attachmentExtension || 'png'};base64,${finalBase64}`
+                        }
+                      }
+                    ]
+                  }],
                   response_format: { type: "json_object" }
                 });
 
                 const result = JSON.parse(response.choices[0].message?.content || '{}');
-                if (result.category && result.category !== 'UNCLASSIFIED') {
-                  category = result.category;
-                  aiSummary = result.aiSummary || aiSummary;
-                  confidenceScore = result.confidenceScore || confidenceScore;
-                  validationErrors = result.validationErrors;
-                }
-
-                // Extract and validate taxYear
+                category = result.category || category;
+                confidenceScore = result.confidenceScore || confidenceScore;
+                aiSummary = result.aiSummary || aiSummary;
+                validationErrors = result.validationErrors || null;
+                
                 let parsedYear = result.taxYear ? Number(result.taxYear) : null;
                 if (parsedYear && !isNaN(parsedYear)) {
                   detectedTaxYear = parsedYear;
                 } else {
                   detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
                 }
-              } catch (reclassErr) {
-                console.error(`[Email Background Worker] Re-classification failed for ${name}:`, reclassErr);
+              } catch (visionClassErr) {
+                console.error(`[Email Background Worker] Direct vision classification failed for image ${name}:`, visionClassErr);
                 detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
               }
-            } else if (extractedText) {
+            } else {
+              // Commented out text classifier for PDF/Doc attachments - direct vision classification runs on the rendered companion PNG instead.
+              /*
+              if (extractedText && (category === 'UNCLASSIFIED' || category.startsWith('1099') || category === 'W2' || category === '1098' || category === '1095-A')) {
+                try {
+                  console.log(`[Email Background Worker] Confirming/refining category (${category}) based on OCR text...`);
+                  const currentYear = new Date().getFullYear();
+                  const previousYear = currentYear - 1;
+                  const prompt = `You are an expert CPA Tax Assistant.
+  Analyze the following raw OCR text extracted from an uploaded client document:
+  ---
+  ${extractedText}
+  ---
+
+  Your task:
+  1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+  2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+  3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+  4. Estimate your parsing confidence score between 0.0 and 1.0.
+  5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+  6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${client.taxYear}.
+
+  Format your output as a JSON object with keys:
+  "category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
+
+                  const response = await openai.chat.completions.create({
+                    model: 'gpt-4o-mini',
+                    messages: [{ role: 'user', content: prompt }],
+                    response_format: { type: "json_object" }
+                  });
+
+                  const result = JSON.parse(response.choices[0].message?.content || '{}');
+                  if (result.category && result.category !== 'UNCLASSIFIED') {
+                    category = result.category;
+                    aiSummary = result.aiSummary || aiSummary;
+                    confidenceScore = result.confidenceScore || confidenceScore;
+                    validationErrors = result.validationErrors;
+                  }
+
+                  // Extract and validate taxYear
+                  let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+                  if (parsedYear && !isNaN(parsedYear)) {
+                    detectedTaxYear = parsedYear;
+                  } else {
+                    detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
+                  }
+                } catch (reclassErr) {
+                  console.error(`[Email Background Worker] Re-classification failed for ${name}:`, reclassErr);
+                  detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
+                }
+              } else if (extractedText) {
+                detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
+              }
+              */
               detectedTaxYear = extractTaxYear(extractedText, client.taxYear);
             }
 
@@ -600,26 +664,65 @@ Format your output as a JSON object with keys:
                   }
 
                   // 2. Classify PNG text using OpenAI
+                  // 2. Classify PNG using direct vision model
+                  if (process.env.OPENAI_API_KEY) {
+                    try {
+                      console.log(`[Email Background Worker] Running direct vision classification on companion PNG...`);
+                      const visionResponse = await openai.chat.completions.create({
+                        model: 'gpt-4o',
+                        messages: [{
+                          role: 'user',
+                          content: [
+                            { type: 'text', text: DIRECT_VISION_CLASSIFIER_PROMPT },
+                            {
+                              type: 'image_url',
+                              image_url: {
+                                url: `data:image/png;base64,${imageBase64}`
+                              }
+                            }
+                          ]
+                        }],
+                        response_format: { type: "json_object" }
+                      });
+
+                      const result = JSON.parse(visionResponse.choices[0].message?.content || '{}');
+                      pngCategory = result.category || pngCategory;
+                      pngAiSummary = result.aiSummary || pngAiSummary;
+                      pngConfidenceScore = result.confidenceScore || pngConfidenceScore;
+                      pngValidationErrors = result.validationErrors || null;
+                      
+                      let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+                      if (parsedYear && !isNaN(parsedYear)) {
+                        detectedTaxYear = parsedYear;
+                      } else {
+                        detectedTaxYear = extractTaxYear(pngText || extractedText, client.taxYear);
+                      }
+                    } catch (visionClassErr) {
+                      console.error("[Email Background Worker] Direct vision classification on companion PNG failed:", visionClassErr);
+                    }
+                  }
+
+                  /* COMMENTED OUT ORIGINAL TEXT-BASED CLASSIFICATION FOR COMPANION PNG
                   if (pngText && process.env.OPENAI_API_KEY) {
                     try {
                       const currentYear = new Date().getFullYear();
                       const previousYear = currentYear - 1;
                       const prompt = `You are an expert CPA Tax Assistant.
-Analyze the following raw OCR text extracted from an uploaded client document:
----
-${pngText}
----
+  Analyze the following raw OCR text extracted from an uploaded client document:
+  ---
+  ${pngText}
+  ---
 
-Your task:
-1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
-2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
-3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
-4. Estimate your parsing confidence score between 0.0 and 1.0.
-5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
-6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${client.taxYear}.
+  Your task:
+  1. Classify the document category into one of these exact options: "W2", "1099-NEC", "1099-SSA", "1099-INT", "1099-DIV", "1099-MISC", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", "UNCLASSIFIED".
+  2. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+  3. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than ${previousYear} or ${currentYear}, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+  4. Estimate your parsing confidence score between 0.0 and 1.0.
+  5. If the document is any form of 1099 (e.g. 1099-R, 1099-G, 1099-B, 1099-K, etc.), always categorize it under its specific 1099 category if listed, or use "1099-UNCLASSIFIED" if it is not one of the specific ones. Never classify a 1099 form as "UNCLASSIFIED".
+  6. Extract the document's tax year (e.g., 2025, 2024, etc.). If you cannot determine the tax year from the text, return ${client.taxYear}.
 
-Format your output as a JSON object with keys:
-"category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
+  Format your output as a JSON object with keys:
+  "category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
 
                       const response = await openai.chat.completions.create({
                         model: 'gpt-4o-mini',
@@ -646,6 +749,7 @@ Format your output as a JSON object with keys:
                   } else if (pngText) {
                     detectedTaxYear = extractTaxYear(pngText, client.taxYear);
                   }
+                  */
 
                   // 3. Check for OMB fingerprint override on PNG text
                   if (pngText) {
@@ -688,13 +792,15 @@ Format your output as a JSON object with keys:
                     }
                   });
 
-                  // 5. Generate RAG chunks for PNG Document
+                  // 5. Generate RAG chunks for PNG Document (DISABLED AS REQUESTED)
                   if (pngText) {
+                    /*
                     try {
                       await processDocumentChunks(pngDocument.id, pngText);
                     } catch (chunkErr) {
                       console.error("Failed to generate document chunks for PNG:", chunkErr);
                     }
+                    */
 
                     // Extract tax form fields if category matches
                     if (pngDocument.category === 'W2' || pngDocument.category.startsWith('1099') || pngDocument.category.includes('1099') || pngDocument.category === '1095-A' || pngDocument.category === '1098') {
@@ -760,11 +866,13 @@ Format your output as a JSON object with keys:
               });
 
               if (extractedText) {
+                /* RAG CHUNKS DISABLED AS REQUESTED
                 try {
                   await processDocumentChunks(docInfo.id, extractedText);
                 } catch (chunkErr) {
                   console.error(`[Email Background Worker] Failed to generate document chunks for ${name}:`, chunkErr);
                 }
+                */
 
                 if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
                   try {

@@ -4,6 +4,24 @@ import { openai } from '@/lib/openai';
 import mammoth from 'mammoth';
 import { processDocumentChunks, extractAndSaveTaxFormData, extractTaxYear } from '@/lib/ai-processor';
 
+const DIRECT_VISION_CLASSIFIER_PROMPT = `
+You are an expert tax document classifier. Analyze the provided document image.
+1. Identify the official IRS Form number or document type (e.g. "W2", "1099-NEC", "1099-MISC", "1099-INT", "1099-DIV", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", or "UNCLASSIFIED" if it's not one of these).
+2. Locate the Tax Year (e.g. 2025, 2024). If not found, return null.
+3. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
+4. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2024 or 2025, or if crucial information is illegible or missing). Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
+5. Estimate your classification confidence score between 0.0 and 1.0.
+
+Return a JSON object with this exact structure:
+{
+  "category": "string",
+  "taxYear": number or null,
+  "aiSummary": "string",
+  "validationErrors": "string" or null,
+  "confidenceScore": number
+}
+`;
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -150,10 +168,49 @@ export async function POST(req: Request) {
                           process.env.OPENAI_API_KEY !== 'dummy_key_for_build_time';
 
         if (hasOpenAI) {
-          try {
-            const currentYear = new Date().getFullYear();
-            const previousYear = currentYear - 1;
-            const prompt = `You are an expert CPA Tax Assistant.
+          if (isImage && fileData) {
+            try {
+              console.log("[Document Route] Running direct vision classification for uploaded image...");
+              const response = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: DIRECT_VISION_CLASSIFIER_PROMPT },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:image/${fileExt || 'png'};base64,${originalImage || fileData}`
+                      }
+                    }
+                  ]
+                }],
+                response_format: { type: "json_object" }
+              });
+
+              const result = JSON.parse(response.choices[0].message?.content || '{}');
+              category = result.category || category;
+              confidenceScore = result.confidenceScore || confidenceScore;
+              aiSummary = result.aiSummary || aiSummary;
+              validationErrors = result.validationErrors || null;
+              
+              let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+              if (parsedYear && !isNaN(parsedYear)) {
+                docTaxYear = parsedYear;
+              } else {
+                docTaxYear = extractTaxYear(rawText, clientTaxYear);
+              }
+            } catch (visionClassErr) {
+              console.error("[Document Route] Direct vision classification on image failed:", visionClassErr);
+              docTaxYear = extractTaxYear(rawText, clientTaxYear);
+            }
+          } else {
+            // Commented out text classifier for PDF/Doc uploads - direct vision classification runs on the rendered companion PNG instead.
+            /*
+            try {
+              const currentYear = new Date().getFullYear();
+              const previousYear = currentYear - 1;
+              const prompt = `You are an expert CPA Tax Assistant.
 Analyze the following raw OCR text extracted from an uploaded client document:
 ---
 ${rawText}
@@ -170,35 +227,38 @@ Your task:
 Format your output as a JSON object with keys:
 "category", "aiSummary", "confidenceScore", "validationErrors", "taxYear"`;
 
-            const response = await openai.chat.completions.create({
-              model: 'gpt-4o-mini',
-              messages: [{ role: 'user', content: prompt }],
-              response_format: { type: "json_object" }
-            });
+              const response = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: prompt }],
+                response_format: { type: "json_object" }
+              });
 
-            const result = JSON.parse(response.choices[0].message?.content || '{}');
-            category = result.category || category;
-            confidenceScore = result.confidenceScore || confidenceScore;
+              const result = JSON.parse(response.choices[0].message?.content || '{}');
+              category = result.category || category;
+              confidenceScore = result.confidenceScore || confidenceScore;
 
-            // Extract and validate taxYear
-            let parsedYear = result.taxYear ? Number(result.taxYear) : null;
-            if (parsedYear && !isNaN(parsedYear)) {
-              docTaxYear = parsedYear;
-            } else {
-              docTaxYear = extractTaxYear(rawText, clientTaxYear);
+              // Extract and validate taxYear
+              let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+              if (parsedYear && !isNaN(parsedYear)) {
+                docTaxYear = parsedYear;
+              } else {
+                docTaxYear = extractTaxYear(rawText, clientTaxYear);
+              }
+
+              if (isLikelyScannedPdf && !visionOcrSucceeded) {
+                // Vision OCR failed — add a note so the accountant knows to re-upload as PNG/JPG
+                aiSummary = (result.aiSummary || '') + " (Note: This appears to be a scanned document. For best OCR results, upload as PNG/JPG image.)";
+                validationErrors = result.validationErrors || "Scanned document detected. Text layer is empty and Vision OCR could not extract content. Re-upload as PNG/JPG for full extraction.";
+              } else {
+                // Either not a scanned PDF or Vision OCR succeeded — use classifier result cleanly
+                aiSummary = result.aiSummary || aiSummary;
+                validationErrors = result.validationErrors || null;
+              }
+            } catch (openaiErr) {
+              console.error("OpenAI processing of raw text failed:", openaiErr);
             }
-
-            if (isLikelyScannedPdf && !visionOcrSucceeded) {
-              // Vision OCR failed — add a note so the accountant knows to re-upload as PNG/JPG
-              aiSummary = (result.aiSummary || '') + " (Note: This appears to be a scanned document. For best OCR results, upload as PNG/JPG image.)";
-              validationErrors = result.validationErrors || "Scanned document detected. Text layer is empty and Vision OCR could not extract content. Re-upload as PNG/JPG for full extraction.";
-            } else {
-              // Either not a scanned PDF or Vision OCR succeeded — use classifier result cleanly
-              aiSummary = result.aiSummary || aiSummary;
-              validationErrors = result.validationErrors || null;
-            }
-          } catch (openaiErr) {
-            console.error("OpenAI processing of raw text failed:", openaiErr);
+            */
+            docTaxYear = extractTaxYear(rawText, clientTaxYear);
           }
         } else {
           docTaxYear = extractTaxYear(rawText, clientTaxYear);
@@ -279,6 +339,45 @@ Format your output as a JSON object with keys:
           }
 
           // 2. Classify PNG text using OpenAI
+          // 2. Classify PNG using direct vision model
+          if (process.env.OPENAI_API_KEY) {
+            try {
+              console.log(`[Document Route] Running direct vision classification on companion PNG...`);
+              const visionResponse = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: DIRECT_VISION_CLASSIFIER_PROMPT },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:image/png;base64,${imageBase64}`
+                      }
+                    }
+                  ]
+                }],
+                response_format: { type: "json_object" }
+              });
+
+              const result = JSON.parse(visionResponse.choices[0].message?.content || '{}');
+              pngCategory = result.category || pngCategory;
+              pngAiSummary = result.aiSummary || pngAiSummary;
+              pngConfidenceScore = result.confidenceScore || pngConfidenceScore;
+              pngValidationErrors = result.validationErrors || null;
+              
+              let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+              if (parsedYear && !isNaN(parsedYear)) {
+                docTaxYear = parsedYear;
+              } else {
+                docTaxYear = extractTaxYear(pngText || rawText, clientTaxYear);
+              }
+            } catch (visionClassErr) {
+              console.error("[Document Route] Direct vision classification on companion PNG failed:", visionClassErr);
+            }
+          }
+
+          /* COMMENTED OUT ORIGINAL TEXT-BASED CLASSIFICATION FOR COMPANION PNG
           if (pngText && process.env.OPENAI_API_KEY) {
             try {
               const currentYear = new Date().getFullYear();
@@ -325,6 +424,7 @@ Format your output as a JSON object with keys:
           } else if (pngText) {
             docTaxYear = extractTaxYear(pngText, clientTaxYear);
           }
+          */
 
           // 3. Check for OMB fingerprint override on PNG text
           if (pngText) {
@@ -387,13 +487,15 @@ Format your output as a JSON object with keys:
             }
           });
 
-          // 7. Generate RAG chunks for PNG Document
+          // 7. Generate RAG chunks for PNG Document (DISABLED AS REQUESTED)
           if (pngText) {
+            /*
             try {
               await processDocumentChunks(pngDocument.id, pngText);
             } catch (chunkErr) {
               console.error("Failed to generate document chunks for PNG:", chunkErr);
             }
+            */
 
             // Extract tax form fields if category matches
             if (pngDocument.category === 'W2' || pngDocument.category.startsWith('1099') || pngDocument.category.includes('1099') || pngDocument.category === '1095-A' || pngDocument.category === '1098') {
@@ -453,11 +555,13 @@ Format your output as a JSON object with keys:
       });
 
       if (extractedText) {
+        /* RAG CHUNKS DISABLED AS REQUESTED
         try {
           await processDocumentChunks(document.id, extractedText);
         } catch (chunkErr) {
           console.error("Failed to generate document chunks on create:", chunkErr);
         }
+        */
 
         if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
           try {
@@ -507,6 +611,7 @@ export async function PATCH(req: Request) {
       console.log(`[Reprocess] Triggering Vision OCR re-extraction for document ${docId}...`);
       let rawText = '';
       let visionOcrSucceeded = false;
+      let imageBase64ToClassify = '';
 
       const fileBuffer = existingDoc.fileData ? Buffer.from(existingDoc.fileData, 'base64') : null;
       const isPdf = existingDoc.name.toLowerCase().endsWith('.pdf') || existingDoc.fileType?.toUpperCase() === 'PDF';
@@ -524,10 +629,22 @@ export async function PATCH(req: Request) {
             visionOcrSucceeded = true;
             console.log(`[Reprocess] OpenAI Files API vision OCR succeeded! Total transcribed chars: ${visionText.length}`);
           }
+
+          // Render first page to PNG for classification
+          try {
+            const { convertPdfToImages } = await import('@/lib/pdf-converter');
+            const pagesBase64 = await convertPdfToImages(fileBuffer, 4, activeCategory);
+            if (pagesBase64 && pagesBase64.length > 0) {
+              imageBase64ToClassify = pagesBase64[0];
+            }
+          } catch (pdfToPngErr) {
+            console.error('[Reprocess] PDF render for direct classification failed:', pdfToPngErr);
+          }
         } catch (pdfErr: any) {
           console.error('[Reprocess] OpenAI Files API vision OCR failed:', pdfErr);
         }
       } else if (isImage && existingDoc.fileData) {
+        imageBase64ToClassify = existingDoc.fileData;
         try {
           console.log(`[Reprocess] Running GPT-4o Vision OCR on uploaded image...`);
           const fileExt = existingDoc.fileType.toLowerCase();
@@ -572,6 +689,48 @@ export async function PATCH(req: Request) {
                           process.env.OPENAI_API_KEY !== 'dummy_key_for_build_time';
 
         if (hasOpenAI) {
+          if (imageBase64ToClassify) {
+            try {
+              console.log(`[Reprocess] Running direct vision classification...`);
+              const visionResponse = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: DIRECT_VISION_CLASSIFIER_PROMPT },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:image/png;base64,${imageBase64ToClassify}`
+                      }
+                    }
+                  ]
+                }],
+                response_format: { type: "json_object" }
+              });
+
+              const result = JSON.parse(visionResponse.choices[0].message?.content || '{}');
+              activeCategory = result.category || activeCategory;
+              activeSummary = result.aiSummary || activeSummary;
+              confidenceScore = result.confidenceScore || confidenceScore;
+              validationErrors = result.validationErrors || null;
+              status = (validationErrors || activeCategory === 'UNCLASSIFIED' || activeCategory === '1099-UNCLASSIFIED') ? 'REVIEW_REQUIRED' : 'VALIDATED';
+
+              let parsedYear = result.taxYear ? Number(result.taxYear) : null;
+              if (parsedYear && !isNaN(parsedYear)) {
+                reprocessTaxYear = parsedYear;
+              } else {
+                reprocessTaxYear = extractTaxYear(rawText, existingDoc.taxYear);
+              }
+            } catch (openaiErr) {
+              console.error("[Reprocess] Direct vision classification failed:", openaiErr);
+              reprocessTaxYear = extractTaxYear(rawText, existingDoc.taxYear);
+            }
+          } else {
+            reprocessTaxYear = extractTaxYear(rawText, existingDoc.taxYear);
+          }
+
+          /* COMMENTED OUT ORIGINAL TEXT-BASED CLASSIFIER FOR REPROCESS
           try {
             const currentYear = new Date().getFullYear();
             const previousYear = currentYear - 1;
@@ -614,6 +773,7 @@ Format your output as a JSON object with keys:
           } catch (openaiErr) {
             console.error("[Reprocess] OpenAI processing of raw text failed:", openaiErr);
           }
+          */
         } else {
           reprocessTaxYear = extractTaxYear(rawText, existingDoc.taxYear);
         }
@@ -654,7 +814,8 @@ Format your output as a JSON object with keys:
       });
     }
 
-    // Re-generate RAG chunks and embeddings
+    // Re-generate RAG chunks and embeddings (DISABLED AS REQUESTED)
+    /*
     const activeTextVal = reprocess ? activeText : extractedText;
     if (activeTextVal !== undefined) {
       try {
@@ -663,6 +824,7 @@ Format your output as a JSON object with keys:
         console.error("Failed to update document chunks after PATCH:", chunkErr);
       }
     }
+    */
 
     // Extract tax form fields if category is W2, 1099, 1095-A, or 1098 and we have text
     if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
