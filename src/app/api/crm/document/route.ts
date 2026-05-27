@@ -397,23 +397,6 @@ Format your output as a JSON object with keys:
           }
         });
 
-        // Run RAG and tax form extraction on the fallback PDF
-        if (extractedText) {
-          try {
-            await processDocumentChunks(document.id, extractedText);
-          } catch (chunkErr) {
-            console.error("Failed to generate document chunks on create fallback:", chunkErr);
-          }
-
-          if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
-            try {
-              await extractAndSaveTaxFormData(document.id, document.category, extractedText);
-            } catch (tfErr) {
-              console.error("Failed to extract tax form data on create fallback:", tfErr);
-            }
-          }
-        }
-
         finalDocument = document;
       }
     } else {

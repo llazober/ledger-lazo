@@ -118,6 +118,7 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
   });
 
   const pdfDocument = await loadingTask.promise;
+  const imagesBase64: string[] = [];
   try {
     let pageToRender = 1;
     let highestScore = 0;

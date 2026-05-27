@@ -716,21 +716,6 @@ Format your output as a JSON object with keys:
                   }
                 });
 
-                if (extractedText) {
-                  try {
-                    await processDocumentChunks(docInfo.id, extractedText);
-                  } catch (chunkErr) {
-                    console.error("Failed to generate document chunks on fallback PDF:", chunkErr);
-                  }
-
-                  if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
-                    try {
-                      await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
-                    } catch (tfErr) {
-                      console.error("Failed to extract tax form data on fallback PDF:", tfErr);
-                    }
-                  }
-                }
               }
             } else {
               // Non-PDF flow (same as original)
