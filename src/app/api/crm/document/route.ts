@@ -345,7 +345,7 @@ export async function PATCH(req: Request) {
               content: [
                 {
                   type: 'text',
-                  text: 'Transcribe ALL visible text from the following document image. Perform high-fidelity OCR, preserving all headers, forms, labels, tables, key-value pairs, numbers, boxes, and SSNs/EINs exactly as printed.'
+                  text: 'Transcribe ALL visible text from the following document image. Perform high-fidelity OCR, preserving all headers, forms, labels, tables, key-value pairs, numbers, boxes, and identifiers exactly as printed.'
                 },
                 {
                   type: 'image_url',
