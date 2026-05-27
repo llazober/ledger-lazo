@@ -246,13 +246,16 @@ Extract the values for the following boxes of Form 1095-A (Health Insurance Mark
     } else if (lowerFormType.includes('1099-ssa') || lowerFormType.includes('ssa-1099')) {
       promptInstructions = `
 Extract the values for the following boxes of Form SSA-1099 (Social Security Benefit Statement):
-- Box 3: Benefits paid (benefitsPaid) -> Numeric value (float or integer).
-- Box 4: Federal income tax withheld (fedIncomeTax) -> Numeric value (float or integer).
-- Box 5: Net benefits (netBenefits) -> Numeric value (float or integer).
 - Payer's TIN/EIN (payerEin) -> Format as string (e.g. "XX-XXXXXXX").
-- Recipient's SSN (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 2: Beneficiary's Social Security Number (recipientSsn) -> Format as string (e.g. "XXX-XX-XXXX").
+- Box 3: Benefits paid (benefitsPaid) -> Numeric value (float or integer).
+- Box 4: Benefits repaid to SSA (benefitsRepaid) -> Numeric value (float or integer).
+- Box 5: Net benefits (netBenefits) -> Numeric value (float or integer).
+- Box 6: Voluntary Federal Income Tax Withheld (fedIncomeTax) -> Numeric value (float or integer).
+- Box 7: Address (address) -> String.
+- Box 8: Claim Number (claimNumber) -> String.
 `;
-      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "benefitsPaid", "fedIncomeTax", "netBenefits"`;
+      jsonSchemaKeysDescription = `"payerEin", "recipientSsn", "benefitsPaid", "benefitsRepaid", "netBenefits", "fedIncomeTax", "address", "claimNumber"`;
     } else if (lowerFormType.includes('1098')) {
       promptInstructions = `
 Extract the values for the following boxes of Form 1098 (Mortgage Interest Statement):
@@ -364,7 +367,7 @@ ${jsonSchemaKeysDescription}`;
     const cleanedBoxes: Record<string, any> = {};
     for (const key of Object.keys(parsedData)) {
       const val = parsedData[key];
-      if (['employeeSsn', 'employerEin', 'payerEin', 'recipientSsn', 'lenderEin', 'borrowerSsn', 'propertyAddress', 'originationDate', 'spouseSsn', 'policyNumber', 'marketplaceIdentifier', 'policyStartDate', 'policyTerminationDate', 'recipientName', 'distributionCode'].includes(key)) {
+      if (['employeeSsn', 'employerEin', 'payerEin', 'recipientSsn', 'lenderEin', 'borrowerSsn', 'propertyAddress', 'originationDate', 'spouseSsn', 'policyNumber', 'marketplaceIdentifier', 'policyStartDate', 'policyTerminationDate', 'recipientName', 'distributionCode', 'address', 'claimNumber'].includes(key)) {
         cleanedBoxes[key] = cleanStr(val);
       } else {
         cleanedBoxes[key] = cleanFloat(val);

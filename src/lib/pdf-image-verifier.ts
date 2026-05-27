@@ -46,7 +46,7 @@ export function compareFields(formType: string, pdfBoxes: Record<string, any>, i
   } else if (formLower.includes('1095-a') || formLower.includes('1095a')) {
     keysToCompare = ['marketplaceIdentifier', 'policyNumber', 'recipientName', 'recipientSsn', 'spouseSsn', 'policyStartDate', 'policyTerminationDate', 'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc'];
   } else if (formLower.includes('1099-ssa') || formLower.includes('ssa-1099')) {
-    keysToCompare = ['payerEin', 'recipientSsn', 'benefitsPaid', 'fedIncomeTax', 'netBenefits'];
+    keysToCompare = ['payerEin', 'recipientSsn', 'benefitsPaid', 'benefitsRepaid', 'netBenefits', 'fedIncomeTax', 'address', 'claimNumber'];
   } else if (formLower.includes('1098')) {
     keysToCompare = ['lenderEin', 'borrowerSsn', 'mortgageInterest', 'outstandingPrincipal', 'originationDate', 'interestRefund', 'mortgageInsurance', 'pointsPaid', 'propertyAddress', 'realEstateTaxes'];
   } else {
@@ -65,7 +65,7 @@ export function compareFields(formType: string, pdfBoxes: Record<string, any>, i
     'totalOrdinaryDividends', 'qualifiedDividends', 'totalCapitalGainDist', 
     'grossDistribution', 'taxableAmount', 'stateIncomeTax', 'stateDistribution',
     'annualEnrollmentPremiums', 'annualSlcspPremium', 'annualAdvancePtc',
-    'benefitsPaid', 'netBenefits',
+    'benefitsPaid', 'benefitsRepaid', 'netBenefits',
     'mortgageInterest', 'outstandingPrincipal', 'interestRefund', 'mortgageInsurance', 'pointsPaid', 'realEstateTaxes'
   ];
 

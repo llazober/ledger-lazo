@@ -71,17 +71,23 @@ const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?:
   ],
   "1099-ssa": [
     { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
-    { label: "Recipient SSN", key: "recipientSsn", isMono: true },
+    { label: "Box 2: Recipient SSN", key: "recipientSsn", isMono: true },
     { label: "Box 3: Benefits Paid", key: "benefitsPaid", isMonetary: true },
-    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
-    { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true }
+    { label: "Box 4: Benefits Repaid", key: "benefitsRepaid", isMonetary: true },
+    { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true },
+    { label: "Box 6: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 7: Address", key: "address" },
+    { label: "Box 8: Claim Number", key: "claimNumber", isMono: true }
   ],
   "ssa-1099": [
     { label: "Payer EIN/TIN", key: "payerEin", isMono: true },
-    { label: "Recipient SSN", key: "recipientSsn", isMono: true },
+    { label: "Box 2: Recipient SSN", key: "recipientSsn", isMono: true },
     { label: "Box 3: Benefits Paid", key: "benefitsPaid", isMonetary: true },
-    { label: "Box 4: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
-    { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true }
+    { label: "Box 4: Benefits Repaid", key: "benefitsRepaid", isMonetary: true },
+    { label: "Box 5: Net Benefits", key: "netBenefits", isMonetary: true },
+    { label: "Box 6: Fed Tax Withheld", key: "fedIncomeTax", isMonetary: true },
+    { label: "Box 7: Address", key: "address" },
+    { label: "Box 8: Claim Number", key: "claimNumber", isMono: true }
   ],
   "1099-r": [
     { label: "Payer EIN/TIN", key: "payerEin", isMono: true },

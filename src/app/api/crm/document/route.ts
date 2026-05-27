@@ -6,7 +6,7 @@ import { processDocumentChunks, extractAndSaveTaxFormData, extractTaxYear } from
 
 const DIRECT_VISION_CLASSIFIER_PROMPT = `
 You are an expert tax document classifier. Analyze the provided document image.
-1. Identify the official IRS Form number or document type (e.g. "W2", "1099-NEC", "1099-MISC", "1099-INT", "1099-DIV", "1099-R", "1099-K", "1099-B", "1099-G", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", or "UNCLASSIFIED" if it's not one of these).
+1. Identify the official IRS Form number or document type (e.g. "W2", "1099-NEC", "1099-MISC", "1099-INT", "1099-DIV", "1099-R", "1099-K", "1099-B", "1099-G", "1099-SSA", "1099-UNCLASSIFIED", "1095-A", "1098", "Bank_Statement", "Receipt", "Tax_Notice", or "UNCLASSIFIED" if it's not one of these).
 2. Locate the Tax Year (e.g. 2025, 2024). If not found, return null.
 3. Generate a 1-sentence professional summary (aiSummary) of the document's contents.
 4. Check for any validation errors or discrepancies (e.g. if the document refers to a tax year other than 2024 or 2025, or if crucial information is illegible or missing). Note: Signature, print, or creation dates in the year immediately following the tax year (e.g. early 2026 for tax year 2025, or early 2025 for tax year 2024) are standard for tax filing and are NOT validation errors/discrepancies. Do NOT flag them. Set validationErrors to a descriptive string if any issues are found, otherwise set it to null.
