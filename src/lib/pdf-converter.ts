@@ -1,6 +1,7 @@
 import { createCanvas, Path2D, DOMMatrix, DOMPoint, DOMRect } from '@napi-rs/canvas';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import fs from 'fs';
 
 /**
  * Converts a PDF buffer into an array of base64-encoded PNG image strings.
@@ -107,11 +108,22 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   
   // Configure PDF.js worker explicitly for Node/Next environment
-  const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  // Check if we are running in standalone production (no node_modules at process.cwd())
+  let workerPath = path.join(process.cwd(), 'public/pdf.worker.mjs');
+  if (!fs.existsSync(workerPath)) {
+    workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
+  }
   pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
 
-  const standardFontDataUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts') + '/';
-  const cMapUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps') + '/';
+  let standardFontDataUrl = path.join(process.cwd(), 'public/standard_fonts') + '/';
+  if (!fs.existsSync(standardFontDataUrl)) {
+    standardFontDataUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/standard_fonts') + '/';
+  }
+  
+  let cMapUrl = path.join(process.cwd(), 'public/cmaps') + '/';
+  if (!fs.existsSync(cMapUrl)) {
+    cMapUrl = path.join(process.cwd(), 'node_modules/pdfjs-dist/cmaps') + '/';
+  }
 
   const loadingTask = pdfjsLib.getDocument({
     data: new Uint8Array(pdfBuffer),
