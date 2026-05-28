@@ -145,4 +145,38 @@ Follow these steps to import the configured workflow files into your n8n workspa
 6. **Activate**: Click the **"Active"** toggle in the top-right corner to go live.
 
 ---
-*Generated for CPA Ledger App | v3.7 — Unified Tax Form Intelligence*
+
+## 7. 🛠️ Server Maintenance & Build Cache Management
+
+On low-resource environments (like a 2GB RAM / 1 vCPU droplet), building a modern Next.js app inside Docker can occasionally crash (`### Killed`), hang, or fail due to memory constraints or disk exhaustion. 
+
+Follow these system administration best practices to keep deployments running fast and reliably.
+
+### 🧹 Docker build cache pruning
+Docker caches every build layer. Over time, these caches accumulate and fill up the SSD, which slows down file system operations and causes image exporting steps to fail.
+*   **Check disk space**: 
+    ```bash
+    df -h
+    ```
+*   **Prune Docker cache (Safe & Recommended)**: Run this periodically or when builds fail at the `exporting layers` stage to reclaim 10GB+ of space:
+    ```bash
+    docker system prune -a --volumes -f
+    ```
+
+### 🧠 Virtual memory swap file
+If the build gets killed during Next.js compilation, it means the server ran out of physical memory. Adding swap space allows the operating system to offload inactive RAM to the disk.
+*   **Check memory and swap status**:
+    ```bash
+    free -h
+    ```
+*   **Create and enable a 2GB swap file (Run as root)**:
+    ```bash
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    ```
+
+---
+*Generated for CPA Ledger App | v3.8 — Unified Tax Form Intelligence & Server Admin Guide*
