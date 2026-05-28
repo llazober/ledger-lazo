@@ -21,6 +21,75 @@ This document outlines the essential maintenance tasks, scheduled routines, and 
 
 ---
 
+## 🚀 New Droplet Provisioning & Hardening Checklist
+
+When setting up a brand-new DigitalOcean droplet, run these steps in order to replicate this optimized, secure environment:
+
+### Step 1: Configure 4GB Swap Space (RAM Protection)
+```bash
+# Create a 4GB swap file
+sudo swapoff -a
+sudo fallocate -l 4G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Make swap permanent (append to /etc/fstab if not present)
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Adjust swappiness to 30 (optimizes RAM usage)
+sudo sysctl vm.swappiness=30
+echo 'vm.swappiness = 30' | sudo tee -a /etc/sysctl.conf
+```
+
+### Step 2: Configure Docker Log Rotation (Disk Protection)
+Create or overwrite `/etc/docker/daemon.json` with the following configuration to prevent logs from eating up all SSD space:
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+```
+Apply the configuration:
+```bash
+sudo systemctl restart docker
+```
+
+### Step 3: Hardened UFW Firewall Setup (Zero-Trust Security)
+Lock down the server to only allow public traffic on web (80/443), SSH (22), and optionally Easypanel (3000). **Never open port 5432 (Postgres) or 5678 (n8n) to the public internet.**
+```bash
+# Set default rules
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow essential services
+sudo ufw allow ssh
+sudo ufw allow http
+sudo ufw allow https
+# Optional: sudo ufw allow 3000/tcp (if using Easypanel IP dashboard directly)
+
+# Enable firewall (type 'y' when prompted)
+sudo ufw enable
+```
+
+### Step 4: Schedule Weekly Docker Cache Pruning (Disk Protection)
+Avoid disk space buildup from frequent builds:
+```bash
+# Open crontab
+sudo crontab -e
+
+# Add the following line to the end of the file:
+# 0 3 * * 0 docker system prune -a -f --volumes > /var/log/docker_prune.log 2>&1
+```
+
+### Step 5: Configure Internal Database Connections in Easypanel
+When adding environment variables or build args to your applications in Easypanel, **never** use the droplet's public IP address for `DATABASE_URL`. Always use the internal database service name (e.g. `postgresql://user:pass@datalazo:5432/datalazo`).
+
+---
+
 ## 1. 🧠 Memory & Swap Management
 
 Memory is the most critical resource on a 2GB droplet. If Postgres and Next.js exceed physical memory, the Ubuntu kernel's Out-Of-Memory (OOM) Killer will terminate process containers (often targeting PostgreSQL first because of its memory footprint).
