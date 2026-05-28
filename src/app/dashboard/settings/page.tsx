@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [twilioToken, setTwilioToken] = useState('');
   const [googleCalUrl, setGoogleCalUrl] = useState('');
   const [aiInstructions, setAiInstructions] = useState('');
+  const [taxExtractorModel, setTaxExtractorModel] = useState('gpt-4o');
 
   // Load settings on mount
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function SettingsPage() {
             setTwilioToken(data.twilioToken || '');
             setGoogleCalUrl(data.googleCalUrl || '');
             setAiInstructions(data.aiInstructions || '');
+            setTaxExtractorModel(data.taxExtractorModel || 'gpt-4o');
           }
         }
       } catch (err) {
@@ -68,6 +70,7 @@ export default function SettingsPage() {
           twilioToken,
           googleCalUrl,
           aiInstructions,
+          taxExtractorModel,
         }),
       });
 
@@ -132,6 +135,18 @@ export default function SettingsPage() {
                   onChange={(e) => setFirmName(e.target.value)}
                   placeholder="Datalazo Ledger Services"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] text-slate-500 font-bold uppercase block mb-1">Tax Document OCR Model</label>
+                <select 
+                  className="w-full bg-[#0a0a0c] border border-white/5 focus:border-[#00f0ff] focus:outline-none rounded-xl p-3 text-slate-200 text-xs text-white"
+                  value={taxExtractorModel}
+                  onChange={(e) => setTaxExtractorModel(e.target.value)}
+                >
+                  <option value="gpt-4o">GPT-4o (High-Accuracy Vision / Default)</option>
+                  <option value="gpt-4o-mini">GPT-4o-Mini (High-Speed / Low-Cost Vision)</option>
+                </select>
               </div>
 
               <div>

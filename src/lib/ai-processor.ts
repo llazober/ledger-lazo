@@ -343,8 +343,23 @@ ${jsonSchemaKeysDescription}`;
       ];
     }
 
+    // Fetch dynamic model choice from settings (default to gpt-4o)
+    let extractorModel = 'gpt-4o';
+    try {
+      const settings = await prisma.settings.findUnique({
+        where: { id: 'global' }
+      });
+      if (settings?.taxExtractorModel) {
+        extractorModel = settings.taxExtractorModel;
+      }
+    } catch (dbErr) {
+      console.warn("[TaxForm Extractor] Could not load dynamic settings for model choice:", dbErr);
+    }
+
+    console.log(`[TaxForm Extractor] Calling OpenAI with model: ${extractorModel}`);
+
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: extractorModel,
       messages,
       response_format: { type: "json_object" }
     });

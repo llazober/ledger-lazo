@@ -58,6 +58,7 @@ export async function POST(req: Request) {
         twilioToken: data.twilioToken,
         googleCalUrl: data.googleCalUrl,
         aiInstructions: data.aiInstructions,
+        taxExtractorModel: data.taxExtractorModel,
       },
       create: {
         id: 'global',
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
         twilioToken: data.twilioToken,
         googleCalUrl: data.googleCalUrl,
         aiInstructions: data.aiInstructions,
+        taxExtractorModel: data.taxExtractorModel || 'gpt-4o',
       },
     });
 

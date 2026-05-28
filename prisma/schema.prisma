@@ -182,6 +182,7 @@ model Settings {
   twilioToken     String?
   googleCalUrl    String?
   aiInstructions  String?  @db.Text
+  taxExtractorModel String   @default("gpt-4o")
   updatedAt       DateTime @updatedAt
 }
 
