@@ -73,7 +73,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
     taxFormData: document.taxFormData ? {
       id: document.taxFormData.id,
       formType: document.taxFormData.formType,
-      boxes: document.taxFormData.boxes || {}
+      boxes: (document.taxFormData.boxes || {}) as any
     } : null,
     createdAt: document.createdAt.toISOString()
   };

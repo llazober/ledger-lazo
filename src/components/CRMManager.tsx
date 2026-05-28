@@ -254,6 +254,8 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  const pngDocs = consoleDocs.filter(doc => doc.fileType?.toUpperCase() === 'PNG' || doc.name.toLowerCase().endsWith('.png'));
+
   const handleOpenConsole = async (client: Client) => {
     setSelectedConsoleClient(client);
     setIsLoadingDocs(true);
@@ -283,17 +285,16 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
   const handleDownloadSelected = async () => {
     const validDocs = selectedConsoleDocs.filter(docId => {
       const doc = consoleDocs.find(d => d.id === docId);
-      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
-      return isPdf;
+      const fileTypeUpper = doc?.fileType?.toUpperCase() || '';
+      const nameLower = doc?.name?.toLowerCase() || '';
+      const isPdf = nameLower.endsWith('.pdf') || fileTypeUpper === 'PDF';
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) || /\.(png|jpe?g|webp)$/i.test(nameLower);
+      return isPdf || isImage;
     });
 
     if (validDocs.length === 0) {
-      alert("No PDF files selected for download. Non-PDF files are excluded from batch operations.");
+      alert("No valid files selected for download.");
       return;
-    }
-
-    if (validDocs.length < selectedConsoleDocs.length) {
-      alert(`Skipping ${selectedConsoleDocs.length - validDocs.length} non-PDF document(s) from the batch download.`);
     }
 
     const docNames = validDocs.map(docId => {
@@ -307,17 +308,16 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
   const handleMergeSelected = async () => {
     const validDocs = selectedConsoleDocs.filter(docId => {
       const doc = consoleDocs.find(d => d.id === docId);
-      const isPdf = doc?.name.toLowerCase().endsWith('.pdf') || doc?.fileType.toUpperCase() === 'PDF';
-      return isPdf;
+      const fileTypeUpper = doc?.fileType?.toUpperCase() || '';
+      const nameLower = doc?.name?.toLowerCase() || '';
+      const isPdf = nameLower.endsWith('.pdf') || fileTypeUpper === 'PDF';
+      const isImage = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(fileTypeUpper) || /\.(png|jpe?g|webp)$/i.test(nameLower);
+      return isPdf || isImage;
     });
 
     if (validDocs.length === 0) {
-      alert("No PDF files selected for merging. Non-PDF files are excluded from batch operations.");
+      alert("No valid files selected for merging.");
       return;
-    }
-
-    if (validDocs.length < selectedConsoleDocs.length) {
-      alert(`Skipping ${selectedConsoleDocs.length - validDocs.length} non-PDF document(s) from the merge.`);
     }
 
     const docNames = validDocs.map(docId => {
@@ -1156,19 +1156,19 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                   Uploaded Client Documents
                 </h4>
                 
-                {consoleDocs.length > 0 && (
+                {pngDocs.length > 0 && (
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
-                        if (selectedConsoleDocs.length === consoleDocs.length) {
+                        if (selectedConsoleDocs.length === pngDocs.length) {
                           setSelectedConsoleDocs([]);
                         } else {
-                          setSelectedConsoleDocs(consoleDocs.map(d => d.id));
+                          setSelectedConsoleDocs(pngDocs.map(d => d.id));
                         }
                       }}
                       className="px-2 py-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[9px] font-bold uppercase rounded transition-all"
                     >
-                      {selectedConsoleDocs.length === consoleDocs.length ? 'Deselect All' : 'Select All'}
+                      {selectedConsoleDocs.length === pngDocs.length ? 'Deselect All' : 'Select All'}
                     </button>
                     {selectedConsoleDocs.length > 0 && (
                       <>
@@ -1196,13 +1196,13 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                 <div className="p-4 text-center text-slate-500 text-xs animate-pulse">
                   Loading files from vault...
                 </div>
-              ) : consoleDocs.length === 0 ? (
+              ) : pngDocs.length === 0 ? (
                 <div className="p-4 text-center border border-dashed border-white/5 rounded-xl text-slate-500 text-xs">
                   No documents uploaded for this client yet.
                 </div>
               ) : (
                 <div className="divide-y divide-white/5 max-h-[180px] overflow-y-auto pr-1 border border-white/5 rounded-xl bg-[#0a0a0c]/40">
-                  {consoleDocs.map(doc => (
+                  {pngDocs.map(doc => (
                     <div key={doc.id} className="p-3 flex justify-between items-center text-xs hover:bg-white/[0.01]">
                       <div className="flex items-center gap-2.5 overflow-hidden pr-2">
                         <input 

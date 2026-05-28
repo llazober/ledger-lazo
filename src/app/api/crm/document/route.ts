@@ -57,10 +57,10 @@ export async function POST(req: Request) {
       }
     }
     let docTaxYear = clientTaxYear;
+    let rawText = '';
 
     if (fileData) {
       const fileBuffer = Buffer.from(fileData, 'base64');
-      let rawText = '';
       
       const fileExt = fileType?.toLowerCase() || '';
       const isPdf = fileExt === 'pdf' || name?.toLowerCase().endsWith('.pdf');
