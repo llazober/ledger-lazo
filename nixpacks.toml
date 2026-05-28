@@ -5,4 +5,4 @@ nixPkgs = ["...", "fontconfig", "freetype"]
 cmds = ["npm install --legacy-peer-deps"]
 
 [phases.build]
-cmds = ["npx prisma generate", "NODE_OPTIONS='--max-old-space-size=800' npm run build"]
+cmds = ["npx prisma generate", "NODE_OPTIONS='--max-old-space-size=2048' npm run build"]
