@@ -147,6 +147,7 @@ By default, PostgreSQL will try to consume memory based on its configuration. In
 1. Navigate to the **PostgreSQL service** settings.
 2. Under **Resources**, configure a hard **Memory Limit** (e.g., `512MB` or `768MB`). This prevents a rogue query from ballooning Postgres memory usage and taking down the whole server.
 3. Keep the Next.js app memory capped at `1024MB` in Easypanel to leave headroom for Ubuntu system processes.
+4. **Internal Routing:** Ensure all applications (like Next.js or n8n) connect to the database internally using the database service name (e.g., `datalazo:5432`) instead of the droplet's public IP address. This bypasses the host UFW firewall and keeps all database traffic secure within the private Docker network.
 
 ### 🧹 Database Health & Bloat Monitoring
 Since database rows are frequently inserted/deleted (especially audit tables or log tables), table bloat can degrade performance.
