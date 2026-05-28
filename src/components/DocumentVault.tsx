@@ -152,9 +152,16 @@ const readFileAsBase64 = (file: File | Blob): Promise<string> => {
 const maskSsnValue = (val: any): string => {
   if (val === null || val === undefined || val === '') return 'Not Found';
   const str = String(val);
-  const clean = str.replace(/[^0-9]/g, '');
-  if (clean.length === 9) {
-    return `***-**-${clean.slice(5)}`;
+  const clean = str.replace(/[-\s]/g, '');
+  const match = clean.match(/^(\d{9})([A-Z0-9]*)$/i);
+  if (match) {
+    return `***-**-${match[1].slice(5)}${match[2]}`;
+  }
+  
+  // Fallback for raw numbers without formatting
+  const digitsOnly = str.replace(/[^0-9]/g, '');
+  if (digitsOnly.length === 9) {
+    return `***-**-${digitsOnly.slice(5)}`;
   }
   return str;
 };
@@ -1209,7 +1216,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
                                 </span>
                               ) : (
                                 <span className={field.isMono ? "text-white font-mono font-semibold text-[9px]" : "text-white font-semibold"}>
-                                  {field.key.toLowerCase().includes('ssn') ? maskSsnValue(val) : (val || 'Not Found')}
+                                  {(field.key.toLowerCase().includes('ssn') || field.key.toLowerCase().includes('claim')) ? maskSsnValue(val) : (val || 'Not Found')}
                                 </span>
                               )}
                             </div>
