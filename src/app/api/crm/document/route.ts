@@ -47,6 +47,12 @@ export async function POST(req: Request) {
     let confidenceScore = clientConfidenceScore || 0.0;
     let validationErrors = clientValidationErrors || null;
 
+    // Fetch global system settings to check for AI bypass toggle
+    const settings = await prisma.settings.findUnique({
+      where: { id: 'global' }
+    });
+    const bypassAi = settings?.bypassAi ?? false;
+
     let clientTaxYear = new Date().getFullYear() - 1;
     if (clientId) {
       const clientRecord = await prisma.client.findUnique({
@@ -142,7 +148,7 @@ export async function POST(req: Request) {
         const isLikelyScannedPdf = isPdf && cleanText.length < 50;
 
         let visionOcrSucceeded = false;
-        if (isLikelyScannedPdf && process.env.OPENAI_API_KEY) {
+        if (isLikelyScannedPdf && process.env.OPENAI_API_KEY && !bypassAi) {
           console.log('[Document Route] Scanned PDF detected — using OpenAI Files API for high-fidelity OCR...');
           try {
             const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
@@ -161,6 +167,8 @@ export async function POST(req: Request) {
             console.error('[Document Route] OpenAI Files API vision OCR failed:', visionFallbackErr?.message);
             validationErrors = 'Scanned document could not be parsed. Please try again or check the file quality.';
           }
+        } else if (isLikelyScannedPdf && bypassAi) {
+          validationErrors = 'Scanned PDF detected. AI processing is bypassed, so text could not be extracted automatically.';
         }
 
         const hasOpenAI = process.env.OPENAI_API_KEY && 
@@ -308,7 +316,7 @@ Format your output as a JSON object with keys:
           let pngValidationErrors = validationErrors;
 
           // 1. Run high-fidelity Vision OCR on the companion image
-          if (process.env.OPENAI_API_KEY) {
+          if (process.env.OPENAI_API_KEY && !bypassAi) {
             try {
               console.log(`[Document Route] Running high-fidelity Vision OCR on converted PNG...`);
               const visionResponse = await openai.chat.completions.create({
@@ -336,11 +344,18 @@ Format your output as a JSON object with keys:
               console.error("[Document Route] Vision OCR on PNG failed, falling back to PDF extracted text:", visionErr);
               pngText = extractedText || '';
             }
+          } else {
+            pngText = extractedText || '';
+            pngConfidenceScore = 1.0;
+            if (bypassAi) {
+              pngAiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
+              aiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
+              confidenceScore = 1.0;
+            }
           }
 
-          // 2. Classify PNG text using OpenAI
           // 2. Classify PNG using direct vision model
-          if (process.env.OPENAI_API_KEY) {
+          if (process.env.OPENAI_API_KEY && !bypassAi) {
             try {
               console.log(`[Document Route] Running direct vision classification on companion PNG...`);
               const visionResponse = await openai.chat.completions.create({
@@ -488,7 +503,7 @@ Format your output as a JSON object with keys:
           });
 
           // 7. Generate RAG chunks for PNG Document (DISABLED AS REQUESTED)
-          if (pngText) {
+          if (pngText && !bypassAi) {
             /*
             try {
               await processDocumentChunks(pngDocument.id, pngText);

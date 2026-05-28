@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const [googleCalUrl, setGoogleCalUrl] = useState('');
   const [aiInstructions, setAiInstructions] = useState('');
   const [taxExtractorModel, setTaxExtractorModel] = useState('gpt-4o');
+  const [bypassAi, setBypassAi] = useState(false);
 
   // Load settings on mount
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function SettingsPage() {
             setGoogleCalUrl(data.googleCalUrl || '');
             setAiInstructions(data.aiInstructions || '');
             setTaxExtractorModel(data.taxExtractorModel || 'gpt-4o');
+            setBypassAi(data.bypassAi || false);
           }
         }
       } catch (err) {
@@ -71,6 +73,7 @@ export default function SettingsPage() {
           googleCalUrl,
           aiInstructions,
           taxExtractorModel,
+          bypassAi,
         }),
       });
 
@@ -147,6 +150,22 @@ export default function SettingsPage() {
                   <option value="gpt-4o">GPT-4o (High-Accuracy Vision / Default)</option>
                   <option value="gpt-4o-mini">GPT-4o-Mini (High-Speed / Low-Cost Vision)</option>
                 </select>
+              </div>
+
+              <div className="flex items-start gap-3 p-3 bg-[#0a0a0c] border border-white/5 rounded-xl hover:border-[#00f0ff]/30 transition-all select-none">
+                <input 
+                  id="bypassAi"
+                  type="checkbox" 
+                  className="h-4.5 w-4.5 rounded border-white/10 bg-slate-900 text-[#00f0ff] focus:ring-[#00f0ff]/30 focus:ring-offset-0 cursor-pointer mt-0.5"
+                  checked={bypassAi}
+                  onChange={(e) => setBypassAi(e.target.checked)}
+                />
+                <label htmlFor="bypassAi" className="text-xs text-slate-300 font-medium cursor-pointer">
+                  Bypass AI OCR for PDF Uploads
+                  <span className="block text-[10px] text-slate-500 font-normal mt-0.5 font-sans leading-normal">
+                    Skips OpenAI calls, extracts digital PDF text layers locally. Direct image uploads (PNG/JPG) will still use Vision AI.
+                  </span>
+                </label>
               </div>
 
               <div>

@@ -59,6 +59,7 @@ export async function POST(req: Request) {
         googleCalUrl: data.googleCalUrl,
         aiInstructions: data.aiInstructions,
         taxExtractorModel: data.taxExtractorModel,
+        bypassAi: data.bypassAi,
       },
       create: {
         id: 'global',
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
         googleCalUrl: data.googleCalUrl,
         aiInstructions: data.aiInstructions,
         taxExtractorModel: data.taxExtractorModel || 'gpt-4o',
+        bypassAi: data.bypassAi || false,
       },
     });
 

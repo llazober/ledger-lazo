@@ -183,6 +183,7 @@ model Settings {
   googleCalUrl    String?
   aiInstructions  String?  @db.Text
   taxExtractorModel String   @default("gpt-4o")
+  bypassAi        Boolean  @default(false)
   updatedAt       DateTime @updatedAt
 }
 

@@ -166,6 +166,12 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { fromEmail, fromName, subject, bodyText, attachments } = body;
 
+    // Fetch global system settings to check for AI bypass toggle
+    const settings = await prisma.settings.findUnique({
+      where: { id: 'global' }
+    });
+    const bypassAi = settings?.bypassAi ?? false;
+
     if (!fromEmail) {
       return NextResponse.json({ success: false, error: "fromEmail is required" }, { status: 400 });
     }
@@ -380,6 +386,7 @@ export async function POST(req: Request) {
             console.log(`[Email Background Worker] Processing document: ${docInfo.name} (${docInfo.id})`);
             
             let extractedText = '';
+            let validationErrors: string | null = null;
             const finalBase64 = docInfo.finalBase64;
             const attachmentExtension = docInfo.attachmentExtension;
             const name = docInfo.name;
@@ -433,7 +440,7 @@ export async function POST(req: Request) {
 
                 // If PDF text layer is nearly empty, it's a scanned PDF — fall back to Vision OCR
                 const cleanPdfText = extractedText.replace(/[\s\-\d]/g, '');
-                if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY) {
+                if (cleanPdfText.length < 50 && process.env.OPENAI_API_KEY && !bypassAi) {
                   console.log(`[Email Background Worker] Scanned PDF detected for ${name} — using OpenAI Files API for high-fidelity OCR...`);
                   try {
                     const { performVisionOcrWithFilesApi } = await import('@/lib/openai-pdf-ocr');
@@ -448,6 +455,8 @@ export async function POST(req: Request) {
                   } catch (visionFallbackErr: any) {
                     console.error(`[Email Background Worker] OpenAI Files API vision OCR failed for ${name}:`, visionFallbackErr?.message);
                   }
+                } else if (cleanPdfText.length < 50 && bypassAi) {
+                  validationErrors = 'Scanned PDF detected. AI processing is bypassed, so text could not be extracted automatically.';
                 }
               } else if (isImage && process.env.OPENAI_API_KEY) {
                 try {
@@ -490,11 +499,20 @@ export async function POST(req: Request) {
             extractedText = extractedText.trim();
 
             // Run classifyDocumentWithAI using OpenAI
-            const aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
+            let aiResult;
+            if (isPdf && bypassAi) {
+              aiResult = fallbackClassifier(name);
+              aiResult.aiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
+              if (!validationErrors) {
+                validationErrors = aiResult.validationErrors;
+              }
+            } else {
+              aiResult = await classifyDocumentWithAI(name, emailSubject, emailBody);
+              validationErrors = aiResult.validationErrors;
+            }
             let category = aiResult.category;
             let aiSummary = aiResult.aiSummary;
             let confidenceScore = aiResult.confidenceScore;
-            let validationErrors = aiResult.validationErrors;
 
             // Check for OMB fingerprint override
             const cleanTextForOMB = extractedText.replace(/[\s\-\_\,\.\/\(\)\*]/g, '').toLowerCase();
@@ -632,7 +650,7 @@ export async function POST(req: Request) {
                   let pngValidationErrors = validationErrors;
 
                   // 1. Run high-fidelity Vision OCR on the companion image
-                  if (process.env.OPENAI_API_KEY) {
+                  if (process.env.OPENAI_API_KEY && !bypassAi) {
                     try {
                       console.log(`[Email Background Worker] Running high-fidelity Vision OCR on converted PNG...`);
                       const visionResponse = await openai.chat.completions.create({
@@ -660,11 +678,18 @@ export async function POST(req: Request) {
                       console.error("[Email Background Worker] Vision OCR on PNG failed, falling back to PDF extracted text:", visionErr);
                       pngText = extractedText || '';
                     }
+                  } else {
+                    pngText = extractedText || '';
+                    pngConfidenceScore = 1.0;
+                    if (bypassAi) {
+                      pngAiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
+                      aiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
+                      confidenceScore = 1.0;
+                    }
                   }
 
-                  // 2. Classify PNG text using OpenAI
                   // 2. Classify PNG using direct vision model
-                  if (process.env.OPENAI_API_KEY) {
+                  if (process.env.OPENAI_API_KEY && !bypassAi) {
                     try {
                       console.log(`[Email Background Worker] Running direct vision classification on companion PNG...`);
                       const visionResponse = await openai.chat.completions.create({
@@ -792,7 +817,7 @@ export async function POST(req: Request) {
                   });
 
                   // 5. Generate RAG chunks for PNG Document (DISABLED AS REQUESTED)
-                  if (pngText) {
+                  if (pngText && !bypassAi) {
                     /*
                     try {
                       await processDocumentChunks(pngDocument.id, pngText);
