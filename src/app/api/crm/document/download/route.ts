@@ -29,7 +29,13 @@ export async function GET(req: Request) {
       let contentType = 'application/octet-stream';
       if (document.fileType === 'PDF') contentType = 'application/pdf';
       else if (document.fileType === 'JPG' || document.fileType === 'JPEG') contentType = 'image/jpeg';
-      else if (document.fileType === 'PNG') contentType = 'image/png';
+      else if (document.fileType === 'PNG') {
+        if (document.fileData && document.fileData.startsWith('/9j/')) {
+          contentType = 'image/jpeg';
+        } else {
+          contentType = 'image/png';
+        }
+      }
 
       const disposition = preview ? 'inline' : `attachment; filename="${document.name}"`;
 

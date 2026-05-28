@@ -238,9 +238,9 @@ export async function convertPdfToImages(pdfBuffer: Buffer, maxPages: number = 3
         canvas: canvas as any,
         renderInteractiveForms: true,
       } as any).promise;
-
-      const pngBuffer = canvas.toBuffer('image/png');
-      imagesBase64.push(pngBuffer.toString('base64'));
+      // Use compressed JPEG instead of uncompressed PNG to save database storage space and improve loading times.
+      const jpegBuffer = canvas.toBuffer('image/jpeg', 80);
+      imagesBase64.push(jpegBuffer.toString('base64'));
     } catch (pageErr) {
       console.error(`[PDF Converter] Failed to render page ${pageToRender}:`, pageErr);
     }

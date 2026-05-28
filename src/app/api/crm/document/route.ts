@@ -323,7 +323,9 @@ Format your output as a JSON object with keys:
                     {
                       type: 'image_url',
                       image_url: {
-                        url: `data:image/png;base64,${imageBase64}`
+                        url: imageBase64.startsWith('/9j/')
+                          ? `data:image/jpeg;base64,${imageBase64}`
+                          : `data:image/png;base64,${imageBase64}`
                       }
                     }
                   ]
