@@ -18,6 +18,7 @@ RUN npm install --legacy-peer-deps --ignore-scripts
 COPY . .
 
 # Copy pdfjs-dist assets to public folder so they are included in standalone runner build
+RUN cp node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs public/ || true
 RUN cp -R node_modules/pdfjs-dist/standard_fonts public/ || true
 RUN cp -R node_modules/pdfjs-dist/cmaps public/ || true
 
