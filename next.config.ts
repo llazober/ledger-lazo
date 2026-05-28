@@ -7,12 +7,6 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   productionBrowserSourceMaps: false,
-  experimental: {
-    webpackBuildWorker: false,
-    webpackMemoryOptimizations: true,
-    workerThreads: false,
-    cpus: 1,
-  },
 };
 
 export default nextConfig;
