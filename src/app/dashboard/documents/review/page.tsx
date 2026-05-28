@@ -67,7 +67,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
     aiSummary: document.aiSummary || '',
     confidenceScore: document.confidenceScore,
     validationErrors: document.validationErrors || null,
-    fileData: document.fileData ? 'present' : null,
+    fileData: document.fileData || null,
     humanVerified: document.humanVerified || false,
     clientName: document.client?.user?.name || 'Unknown Client',
     taxFormData: document.taxFormData ? {

@@ -647,11 +647,9 @@ export async function POST(req: Request) {
                             {
                               type: 'image_url',
                               image_url: {
-                                url: imageBase64.startsWith('/9j/')
-                                  ? `data:image/jpeg;base64,${imageBase64}`
-                                  : `data:image/png;base64,${imageBase64}`
-                              }
-                            }
+                                url: `data:image/png;base64,${imageBase64}`
+                      }
+                    }
                   ]
                 }],
                 max_tokens: 4000
@@ -678,9 +676,7 @@ export async function POST(req: Request) {
                             {
                               type: 'image_url',
                               image_url: {
-                                url: imageBase64.startsWith('/9j/')
-                                  ? `data:image/jpeg;base64,${imageBase64}`
-                                  : `data:image/png;base64,${imageBase64}`
+                                url: `data:image/png;base64,${imageBase64}`
                               }
                             }
                           ]

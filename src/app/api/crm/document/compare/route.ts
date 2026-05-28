@@ -62,9 +62,7 @@ export async function POST(req: Request) {
               {
                 type: 'image_url',
                 image_url: {
-                  url: (comp.fileData || '').startsWith('/9j/')
-                    ? `data:image/jpeg;base64,${comp.fileData}`
-                    : `data:image/png;base64,${comp.fileData}`
+                  url: `data:image/png;base64,${comp.fileData}`
                 }
               }
             ]

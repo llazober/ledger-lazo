@@ -370,13 +370,19 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
           <div className="w-full h-[calc(100vh-220px)] border border-white/10 rounded-xl overflow-auto bg-[#0a0a0c] relative flex items-start justify-center p-4">
             {initialDoc.fileType.toUpperCase() === 'PDF' ? (
               <iframe
-                src={`/accounting/api/crm/document/download?docId=${initialDoc.id}&preview=true`}
+                src={`data:application/pdf;base64,${initialDoc.fileData}`}
                 className="w-full h-full min-w-[750px] min-h-[950px] border-none bg-slate-900 shadow-2xl rounded-lg"
                 title={initialDoc.name}
               />
             ) : (
               <img
-                src={`/accounting/api/crm/document/download?docId=${initialDoc.id}&preview=true`}
+                src={`data:${
+                  initialDoc.fileType.toLowerCase().includes('png') 
+                    ? 'image/png' 
+                    : initialDoc.fileType.toLowerCase().includes('gif') 
+                      ? 'image/gif' 
+                      : 'image/jpeg'
+                };base64,${initialDoc.fileData}`}
                 className="max-w-none w-auto h-auto min-w-[850px] bg-slate-900 shadow-2xl rounded-lg border border-white/5 select-none"
                 alt={initialDoc.name}
               />
