@@ -167,8 +167,6 @@ export async function POST(req: Request) {
             console.error('[Document Route] OpenAI Files API vision OCR failed:', visionFallbackErr?.message);
             validationErrors = 'Scanned document could not be parsed. Please try again or check the file quality.';
           }
-        } else if (isLikelyScannedPdf && bypassAi) {
-          validationErrors = 'Scanned PDF detected. AI processing is bypassed, so text could not be extracted automatically.';
         }
 
         const hasOpenAI = process.env.OPENAI_API_KEY && 
@@ -316,7 +314,7 @@ Format your output as a JSON object with keys:
           let pngValidationErrors = validationErrors;
 
           // 1. Run high-fidelity Vision OCR on the companion image
-          if (process.env.OPENAI_API_KEY && !bypassAi) {
+          if (process.env.OPENAI_API_KEY) {
             try {
               console.log(`[Document Route] Running high-fidelity Vision OCR on converted PNG...`);
               const visionResponse = await openai.chat.completions.create({
@@ -347,15 +345,10 @@ Format your output as a JSON object with keys:
           } else {
             pngText = extractedText || '';
             pngConfidenceScore = 1.0;
-            if (bypassAi) {
-              pngAiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
-              aiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
-              confidenceScore = 1.0;
-            }
           }
 
           // 2. Classify PNG using direct vision model
-          if (process.env.OPENAI_API_KEY && !bypassAi) {
+          if (process.env.OPENAI_API_KEY) {
             try {
               console.log(`[Document Route] Running direct vision classification on companion PNG...`);
               const visionResponse = await openai.chat.completions.create({
@@ -503,7 +496,7 @@ Format your output as a JSON object with keys:
           });
 
           // 7. Generate RAG chunks for PNG Document (DISABLED AS REQUESTED)
-          if (pngText && !bypassAi) {
+          if (pngText) {
             /*
             try {
               await processDocumentChunks(pngDocument.id, pngText);

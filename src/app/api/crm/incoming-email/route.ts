@@ -455,8 +455,6 @@ export async function POST(req: Request) {
                   } catch (visionFallbackErr: any) {
                     console.error(`[Email Background Worker] OpenAI Files API vision OCR failed for ${name}:`, visionFallbackErr?.message);
                   }
-                } else if (cleanPdfText.length < 50 && bypassAi) {
-                  validationErrors = 'Scanned PDF detected. AI processing is bypassed, so text could not be extracted automatically.';
                 }
               } else if (isImage && process.env.OPENAI_API_KEY) {
                 try {
@@ -650,7 +648,7 @@ export async function POST(req: Request) {
                   let pngValidationErrors = validationErrors;
 
                   // 1. Run high-fidelity Vision OCR on the companion image
-                  if (process.env.OPENAI_API_KEY && !bypassAi) {
+                  if (process.env.OPENAI_API_KEY) {
                     try {
                       console.log(`[Email Background Worker] Running high-fidelity Vision OCR on converted PNG...`);
                       const visionResponse = await openai.chat.completions.create({
@@ -681,15 +679,10 @@ export async function POST(req: Request) {
                   } else {
                     pngText = extractedText || '';
                     pngConfidenceScore = 1.0;
-                    if (bypassAi) {
-                      pngAiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
-                      aiSummary = "AI Document Processing Bypassed (Bypass AI enabled in Settings)";
-                      confidenceScore = 1.0;
-                    }
                   }
 
                   // 2. Classify PNG using direct vision model
-                  if (process.env.OPENAI_API_KEY && !bypassAi) {
+                  if (process.env.OPENAI_API_KEY) {
                     try {
                       console.log(`[Email Background Worker] Running direct vision classification on companion PNG...`);
                       const visionResponse = await openai.chat.completions.create({
@@ -817,7 +810,7 @@ export async function POST(req: Request) {
                   });
 
                   // 5. Generate RAG chunks for PNG Document (DISABLED AS REQUESTED)
-                  if (pngText && !bypassAi) {
+                  if (pngText) {
                     /*
                     try {
                       await processDocumentChunks(pngDocument.id, pngText);
