@@ -18,6 +18,7 @@ export default function DashboardLayout({
     { name: 'RAG Tax Assistant', path: '/dashboard/tax-planning', color: 'text-purple-400 hover:bg-purple-500/10' },
     { name: 'Voice Receptionist', path: '/dashboard/voice-agent', color: 'text-emerald-400 hover:bg-emerald-500/10' },
     { name: 'Calendar & Deadlines', path: '/dashboard/appointments', color: 'text-rose-400 hover:bg-rose-500/10' },
+    { name: 'AI Token Matrix', path: '/dashboard/ai-usage', color: 'text-pink-400 hover:bg-pink-500/10' },
     { name: 'System Settings', path: '/dashboard/settings', color: 'text-amber-400 hover:bg-amber-500/10' },
   ];
 

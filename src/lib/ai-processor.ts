@@ -364,6 +364,32 @@ ${jsonSchemaKeysDescription}`;
       response_format: { type: "json_object" }
     });
 
+    // Log token usage to database
+    try {
+      const usage = response.usage;
+      if (usage) {
+        const promptTokens = usage.prompt_tokens;
+        const completionTokens = usage.completion_tokens;
+        const totalTokens = usage.total_tokens;
+        const promptRate = extractorModel.includes('mini') ? 0.15 / 1000000 : 2.50 / 1000000;
+        const completionRate = extractorModel.includes('mini') ? 0.60 / 1000000 : 10.00 / 1000000;
+        const cost = (promptTokens * promptRate) + (completionTokens * completionRate);
+
+        await prisma.tokenUsage.create({
+          data: {
+            feature: 'OCR & EXTRACTION',
+            model: extractorModel,
+            promptTokens,
+            completionTokens,
+            totalTokens,
+            cost
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("[TaxForm Extractor] Failed to log token usage:", err);
+    }
+
     const parsedData = JSON.parse(response.choices[0].message?.content || '{}');
 
     // Clean up numerical floats and strings
