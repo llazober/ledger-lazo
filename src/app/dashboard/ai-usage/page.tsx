@@ -5,57 +5,64 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 async function getOrSeedUsageData() {
-  let usages = await prisma.tokenUsage.findMany({
-    orderBy: { createdAt: 'desc' }
-  });
-
-  // Seed default values matching the user's image if the table is empty
-  if (usages.length === 0) {
-    try {
-      await prisma.tokenUsage.createMany({
-        data: [
-          {
-            feature: 'SEO CONTENT',
-            model: 'gpt-4o-mini',
-            promptTokens: 9000,
-            completionTokens: 4000,
-            totalTokens: 13000,
-            cost: 0.0141,
-          },
-          {
-            feature: 'CHAT',
-            model: 'gpt-4o-mini',
-            promptTokens: 12000,
-            completionTokens: 3700,
-            totalTokens: 15700,
-            cost: 0.0035,
-          },
-          {
-            feature: 'VOICE AGENT',
-            model: 'gpt-4o',
-            promptTokens: 1500,
-            completionTokens: 600,
-            totalTokens: 2100,
-            cost: 0.0205,
-          },
-          {
-            feature: 'OCR & EXTRACTION',
-            model: 'gpt-4o',
-            promptTokens: 4000,
-            completionTokens: 2000,
-            totalTokens: 6000,
-            cost: 0.0540,
-          }
-        ]
-      });
-      usages = await prisma.tokenUsage.findMany({
-        orderBy: { createdAt: 'desc' }
-      });
-    } catch (err) {
-      console.error("Failed to seed default token usages:", err);
+  const fallbackData = [
+    {
+      feature: 'SEO CONTENT',
+      model: 'gpt-4o-mini',
+      promptTokens: 9000,
+      completionTokens: 4000,
+      totalTokens: 13000,
+      cost: 0.0141,
+    },
+    {
+      feature: 'CHAT',
+      model: 'gpt-4o-mini',
+      promptTokens: 12000,
+      completionTokens: 3700,
+      totalTokens: 15700,
+      cost: 0.0035,
+    },
+    {
+      feature: 'VOICE AGENT',
+      model: 'gpt-4o',
+      promptTokens: 1500,
+      completionTokens: 600,
+      totalTokens: 2100,
+      cost: 0.0205,
+    },
+    {
+      feature: 'OCR & EXTRACTION',
+      model: 'gpt-4o',
+      promptTokens: 4000,
+      completionTokens: 2000,
+      totalTokens: 6000,
+      cost: 0.0540,
     }
+  ];
+
+  try {
+    let usages = await prisma.tokenUsage.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Seed default values matching the user's image if the table is empty
+    if (usages.length === 0) {
+      try {
+        await prisma.tokenUsage.createMany({
+          data: fallbackData
+        });
+        usages = await prisma.tokenUsage.findMany({
+          orderBy: { createdAt: 'desc' }
+        });
+      } catch (err) {
+        console.error("Failed to seed default token usages:", err);
+      }
+    }
+    return usages;
+  } catch (dbErr) {
+    console.warn("Could not query database for token usage statistics during build or offline state. Using default visualization fallback data.");
+    return fallbackData;
   }
-  return usages;
 }
 
 export default async function AIUsagePage() {
