@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install dependencies (runs in place)
 COPY package.json package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 # Copy source files
 COPY . .
