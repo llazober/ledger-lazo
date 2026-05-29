@@ -24,6 +24,7 @@ export async function GET(req: Request) {
         taxYear: true,
         category: true,
         status: true,
+        humanVerified: true,
         createdAt: true
       }
     });

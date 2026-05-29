@@ -1184,12 +1184,10 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                             <span>•</span>
                             <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
                             <span>•</span>
-                            {doc.status === 'OCR_PROCESSING' ? (
-                              <span className="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded animate-pulse">OCR SCANNING</span>
-                            ) : doc.status === 'REVIEW_REQUIRED' ? (
-                              <span className="text-[9px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/10">NEEDS REVIEW</span>
+                            {doc.humanVerified ? (
+                              <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/10">VERIFIED</span>
                             ) : (
-                              <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">VALIDATED</span>
+                              <span className="text-[9px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/10">PENDING</span>
                             )}
                           </div>
                         </div>
@@ -1206,7 +1204,7 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                           👁️ Preview
                         </a>
                         <a 
-                          href={`/dashboard/documents/review?id=${doc.id}`}
+                          href={`/accounting/dashboard/documents/review?id=${doc.id}`}
                           className="px-2.5 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/20 text-[11px] font-bold rounded-lg transition-all"
                           title="Verify document data"
                         >
