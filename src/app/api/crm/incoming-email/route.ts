@@ -820,7 +820,9 @@ export async function POST(req: Request) {
                     */
 
                     // Extract tax form fields if category matches
-                    if (pngDocument.category === 'W2' || pngDocument.category.startsWith('1099') || pngDocument.category.includes('1099') || pngDocument.category === '1095-A' || pngDocument.category === '1098') {
+                    const catUpper = (pngDocument.category || '').toUpperCase();
+                    const isTaxForm = catUpper === 'W2' || catUpper === '1095-A' || catUpper === '1098' || catUpper.includes('1099') || ['1120S', '1065', '1120', 'K1-1120S', 'K1-1065'].includes(catUpper);
+                    if (isTaxForm) {
                       try {
                         await extractAndSaveTaxFormData(pngDocument.id, pngDocument.category, pngText);
                       } catch (tfErr) {
@@ -891,7 +893,9 @@ export async function POST(req: Request) {
                 }
                 */
 
-                if (category === 'W2' || category.startsWith('1099') || category.includes('1099') || category === '1095-A' || category === '1098') {
+                const catUpper = (category || '').toUpperCase();
+                const isTaxForm = catUpper === 'W2' || catUpper === '1095-A' || catUpper === '1098' || catUpper.includes('1099') || ['1120S', '1065', '1120', 'K1-1120S', 'K1-1065'].includes(catUpper);
+                if (isTaxForm) {
                   try {
                     await extractAndSaveTaxFormData(docInfo.id, category, extractedText);
                   } catch (tfErr) {

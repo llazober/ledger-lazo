@@ -506,7 +506,9 @@ Format your output as a JSON object with keys:
             */
 
             // Extract tax form fields if category matches
-            if (pngDocument.category === 'W2' || pngDocument.category.startsWith('1099') || pngDocument.category.includes('1099') || pngDocument.category === '1095-A' || pngDocument.category === '1098') {
+            const catUpper = (pngDocument.category || '').toUpperCase();
+            const isTaxForm = catUpper === 'W2' || catUpper === '1095-A' || catUpper === '1098' || catUpper.includes('1099') || ['1120S', '1065', '1120', 'K1-1120S', 'K1-1065'].includes(catUpper);
+            if (isTaxForm) {
               try {
                 await extractAndSaveTaxFormData(pngDocument.id, pngDocument.category, pngText);
               } catch (tfErr) {
@@ -571,7 +573,9 @@ Format your output as a JSON object with keys:
         }
         */
 
-        if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
+        const catUpper = (document.category || '').toUpperCase();
+        const isTaxForm = catUpper === 'W2' || catUpper === '1095-A' || catUpper === '1098' || catUpper.includes('1099') || ['1120S', '1065', '1120', 'K1-1120S', 'K1-1065'].includes(catUpper);
+        if (isTaxForm) {
           try {
             await extractAndSaveTaxFormData(document.id, document.category, extractedText);
           } catch (tfErr) {
@@ -834,8 +838,10 @@ Format your output as a JSON object with keys:
     }
     */
 
-    // Extract tax form fields if category is W2, 1099, 1095-A, or 1098 and we have text
-    if (document.category === 'W2' || document.category.startsWith('1099') || document.category.includes('1099') || document.category === '1095-A' || document.category === '1098') {
+    // Extract tax form fields if category is W2, 1099, 1095-A, 1098, or corporate and we have text
+    const catUpper = (document.category || '').toUpperCase();
+    const isTaxForm = catUpper === 'W2' || catUpper === '1095-A' || catUpper === '1098' || catUpper.includes('1099') || ['1120S', '1065', '1120', 'K1-1120S', 'K1-1065'].includes(catUpper);
+    if (isTaxForm) {
       const activeTextForForm = reprocess ? activeText : (extractedText !== undefined ? extractedText : document.extractedText);
       if (activeTextForForm) {
         try {

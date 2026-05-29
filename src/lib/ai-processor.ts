@@ -271,6 +271,61 @@ Extract the values for the following boxes of Form 1098 (Mortgage Interest State
 - Box 10: Real estate taxes (realEstateTaxes) -> Numeric value (float or integer).
 `;
       jsonSchemaKeysDescription = `"lenderEin", "borrowerSsn", "mortgageInterest", "outstandingPrincipal", "originationDate", "interestRefund", "mortgageInsurance", "pointsPaid", "propertyAddress", "realEstateTaxes"`;
+    } else if (lowerFormType.includes('1120s') && !lowerFormType.includes('k1') && !lowerFormType.includes('k-1')) {
+      promptInstructions = `
+Extract the values for the following fields from Form 1120S (U.S. Income Tax Return for an S Corporation):
+- Employer Identification Number (employerEin) -> Format as string (e.g. "XX-XXXXXXX"). Look in Box A.
+- Box 1a: Gross receipts or sales (grossReceipts) -> Numeric value.
+- Box 2: Cost of goods sold (costOfGoodsSold) -> Numeric value.
+- Box 3: Gross profit (grossProfit) -> Numeric value.
+- Box 6: Total income (loss) (totalIncome) -> Numeric value.
+- Box 21: Ordinary business income (loss) (ordinaryBusinessIncome) -> Numeric value.
+`;
+      jsonSchemaKeysDescription = `"employerEin", "grossReceipts", "costOfGoodsSold", "grossProfit", "totalIncome", "ordinaryBusinessIncome"`;
+    } else if (lowerFormType.includes('1065') && !lowerFormType.includes('k1') && !lowerFormType.includes('k-1')) {
+      promptInstructions = `
+Extract the values for the following fields from Form 1065 (U.S. Return of Partnership Income):
+- Employer Identification Number (employerEin) -> Format as string (e.g. "XX-XXXXXXX"). Look in Box A.
+- Box 1a: Gross receipts or sales (grossReceipts) -> Numeric value.
+- Box 2: Cost of goods sold (costOfGoodsSold) -> Numeric value.
+- Box 3: Gross profit (grossProfit) -> Numeric value.
+- Box 22: Ordinary business income (loss) (ordinaryBusinessIncome) -> Numeric value.
+`;
+      jsonSchemaKeysDescription = `"employerEin", "grossReceipts", "costOfGoodsSold", "grossProfit", "ordinaryBusinessIncome"`;
+    } else if (lowerFormType.includes('1120') && !lowerFormType.includes('1120s') && !lowerFormType.includes('1120-s') && !lowerFormType.includes('k1') && !lowerFormType.includes('k-1')) {
+      promptInstructions = `
+Extract the values for the following fields from Form 1120 (U.S. Corporation Income Tax Return):
+- Employer Identification Number (employerEin) -> Format as string (e.g. "XX-XXXXXXX"). Look in Box A.
+- Box 1a: Gross receipts or sales (grossReceipts) -> Numeric value.
+- Box 2: Cost of goods sold (costOfGoodsSold) -> Numeric value.
+- Box 3: Gross profit (grossProfit) -> Numeric value.
+- Box 30: Taxable income (taxableIncome) -> Numeric value.
+- Box 31: Total tax (totalTax) -> Numeric value.
+`;
+      jsonSchemaKeysDescription = `"employerEin", "grossReceipts", "costOfGoodsSold", "grossProfit", "taxableIncome", "totalTax"`;
+    } else if (lowerFormType.includes('k1') || lowerFormType.includes('k-1')) {
+      if (lowerFormType.includes('1120s') || lowerFormType.includes('1120-s') || lowerFormType.includes('shareholder')) {
+        promptInstructions = `
+Extract the values for the following fields from Schedule K-1 (Form 1120S) (Shareholder's Share of Income, Deductions, Credits, etc.):
+- Corporation's Employer Identification Number (corporationEin) -> Format as string (e.g. "XX-XXXXXXX"). Look in Part I, Box A.
+- Shareholder's identifying number/SSN (shareholderSsn) -> Format as string (e.g. "XXX-XX-XXXX"). Look in Part II, Box F.
+- Box 1: Ordinary business income (loss) (ordinaryIncome) -> Numeric value.
+- Box 2: Net rental real estate income (loss) (netRentalRealEstate) -> Numeric value.
+- Box 4: Interest income (interestIncome) -> Numeric value.
+- Box 5a: Ordinary dividends (dividends) -> Numeric value.
+`;
+        jsonSchemaKeysDescription = `"corporationEin", "shareholderSsn", "ordinaryIncome", "netRentalRealEstate", "interestIncome", "dividends"`;
+      } else {
+        promptInstructions = `
+Extract the values for the following fields from Schedule K-1 (Form 1065) (Partner's Share of Income, Deductions, Credits, etc.):
+- Partnership's Employer Identification Number (partnershipEin) -> Format as string (e.g. "XX-XXXXXXX"). Look in Part I, Box A.
+- Partner's identifying number/SSN (partnerSsn) -> Format as string (e.g. "XXX-XX-XXXX"). Look in Part II, Box E.
+- Box 1: Ordinary business income (loss) (ordinaryIncome) -> Numeric value.
+- Box 2: Net rental real estate income (loss) (netRentalRealEstate) -> Numeric value.
+- Box 14: Self-employment earnings (loss) (selfEmployment) -> Numeric value.
+`;
+        jsonSchemaKeysDescription = `"partnershipEin", "partnerSsn", "ordinaryIncome", "netRentalRealEstate", "selfEmployment"`;
+      }
     } else if (lowerFormType.includes('1099') || lowerFormType.includes('unclassified') || lowerFormType.includes('other')) {
       promptInstructions = `
 This is a general or unclassified Form ${formType}.
@@ -408,7 +463,7 @@ ${jsonSchemaKeysDescription}`;
     const cleanedBoxes: Record<string, any> = {};
     for (const key of Object.keys(parsedData)) {
       const val = parsedData[key];
-      if (['employeeSsn', 'employerEin', 'payerEin', 'recipientSsn', 'lenderEin', 'borrowerSsn', 'propertyAddress', 'originationDate', 'spouseSsn', 'policyNumber', 'marketplaceIdentifier', 'policyStartDate', 'policyTerminationDate', 'recipientName', 'distributionCode', 'address', 'claimNumber'].includes(key)) {
+      if (['employeeSsn', 'employerEin', 'payerEin', 'recipientSsn', 'lenderEin', 'borrowerSsn', 'propertyAddress', 'originationDate', 'spouseSsn', 'policyNumber', 'marketplaceIdentifier', 'policyStartDate', 'policyTerminationDate', 'recipientName', 'distributionCode', 'address', 'claimNumber', 'corporationEin', 'partnershipEin', 'shareholderSsn', 'partnerSsn'].includes(key)) {
         cleanedBoxes[key] = cleanStr(val);
       } else {
         cleanedBoxes[key] = cleanFloat(val);

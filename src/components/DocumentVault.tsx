@@ -134,6 +134,44 @@ const TAX_FORM_LABELS: Record<string, { label: string; key: string; isMonetary?:
     { label: "Box 6: Points Paid", key: "pointsPaid", isMonetary: true },
     { label: "Box 7: Property Address", key: "propertyAddress" },
     { label: "Box 10: Real Estate Taxes", key: "realEstateTaxes", isMonetary: true }
+  ],
+  "1120s": [
+    { label: "Box A: Employer EIN", key: "employerEin", isMono: true },
+    { label: "Box 1a: Gross Receipts/Sales", key: "grossReceipts", isMonetary: true },
+    { label: "Box 2: Cost of Goods Sold", key: "costOfGoodsSold", isMonetary: true },
+    { label: "Box 3: Gross Profit", key: "grossProfit", isMonetary: true },
+    { label: "Box 6: Total Income (Loss)", key: "totalIncome", isMonetary: true },
+    { label: "Box 21: Ordinary Business Income", key: "ordinaryBusinessIncome", isMonetary: true }
+  ],
+  "1065": [
+    { label: "Box A: Employer EIN", key: "employerEin", isMono: true },
+    { label: "Box 1a: Gross Receipts/Sales", key: "grossReceipts", isMonetary: true },
+    { label: "Box 2: Cost of Goods Sold", key: "costOfGoodsSold", isMonetary: true },
+    { label: "Box 3: Gross Profit", key: "grossProfit", isMonetary: true },
+    { label: "Box 22: Ordinary Business Income", key: "ordinaryBusinessIncome", isMonetary: true }
+  ],
+  "1120": [
+    { label: "Box A: Employer EIN", key: "employerEin", isMono: true },
+    { label: "Box 1a: Gross Receipts/Sales", key: "grossReceipts", isMonetary: true },
+    { label: "Box 2: Cost of Goods Sold", key: "costOfGoodsSold", isMonetary: true },
+    { label: "Box 3: Gross Profit", key: "grossProfit", isMonetary: true },
+    { label: "Box 30: Taxable Income", key: "taxableIncome", isMonetary: true },
+    { label: "Box 31: Total Tax", key: "totalTax", isMonetary: true }
+  ],
+  "k1-1120s": [
+    { label: "Part I, A: Corporation EIN", key: "corporationEin", isMono: true },
+    { label: "Part II, F: Shareholder SSN/TIN", key: "shareholderSsn", isMono: true },
+    { label: "Box 1: Ordinary Business Income", key: "ordinaryIncome", isMonetary: true },
+    { label: "Box 2: Net Rental Real Estate", key: "netRentalRealEstate", isMonetary: true },
+    { label: "Box 4: Interest Income", key: "interestIncome", isMonetary: true },
+    { label: "Box 5a: Ordinary Dividends", key: "dividends", isMonetary: true }
+  ],
+  "k1-1065": [
+    { label: "Part I, A: Partnership EIN", key: "partnershipEin", isMono: true },
+    { label: "Part II, E: Partner SSN/TIN", key: "partnerSsn", isMono: true },
+    { label: "Box 1: Ordinary Business Income", key: "ordinaryIncome", isMonetary: true },
+    { label: "Box 2: Net Rental Real Estate", key: "netRentalRealEstate", isMonetary: true },
+    { label: "Box 14: Self-Employment Earnings", key: "selfEmployment", isMonetary: true }
   ]
 };
 
