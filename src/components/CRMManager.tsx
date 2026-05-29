@@ -1162,41 +1162,6 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">
                   Uploaded Client Documents
                 </h4>
-                
-                {pngDocs.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        if (selectedConsoleDocs.length === pngDocs.length) {
-                          setSelectedConsoleDocs([]);
-                        } else {
-                          setSelectedConsoleDocs(pngDocs.map(d => d.id));
-                        }
-                      }}
-                      className="px-2 py-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[9px] font-bold uppercase rounded transition-all"
-                    >
-                      {selectedConsoleDocs.length === pngDocs.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                    {selectedConsoleDocs.length > 0 && (
-                      <>
-                        <button
-                          onClick={handleDownloadSelected}
-                          className="px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white text-[10px] font-extrabold uppercase rounded-lg border border-white/15 transition-all flex items-center gap-1"
-                          title="Download selected as ZIP archive"
-                        >
-                          📥 ZIP ({selectedConsoleDocs.length})
-                        </button>
-                        <button
-                          onClick={handleMergeSelected}
-                          className="px-2.5 py-1 bg-[#00f0ff] hover:bg-cyan-400 text-slate-900 text-[10px] font-extrabold uppercase rounded-lg shadow-[0_0_10px_rgba(0,240,255,0.2)] transition-all flex items-center gap-1"
-                          title="Merge selected files into a single PDF document"
-                        >
-                          🗂️ Merge ({selectedConsoleDocs.length})
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
               
               {isLoadingDocs ? (
@@ -1212,18 +1177,20 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                   {pngDocs.map(doc => (
                     <div key={doc.id} className="p-3 flex justify-between items-center text-xs hover:bg-white/[0.01]">
                       <div className="flex items-center gap-2.5 overflow-hidden pr-2">
-                        <input 
-                          type="checkbox"
-                          checked={selectedConsoleDocs.includes(doc.id)}
-                          onChange={() => handleToggleDocSelection(doc.id)}
-                          className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
-                        />
                         <div className="overflow-hidden text-left">
                           <span className="font-semibold text-white block truncate max-w-[220px]">{doc.name}</span>
                           <div className="flex gap-2 items-center text-[10px] text-slate-500 mt-0.5">
                             <span className="bg-white/5 px-1.5 py-0.5 rounded font-black text-slate-400 uppercase text-[9px]">{doc.category}</span>
                             <span>•</span>
                             <span>{(doc.fileSize / 1024).toFixed(1)} KB</span>
+                            <span>•</span>
+                            {doc.status === 'OCR_PROCESSING' ? (
+                              <span className="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded animate-pulse">OCR SCANNING</span>
+                            ) : doc.status === 'REVIEW_REQUIRED' ? (
+                              <span className="text-[9px] text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/10">NEEDS REVIEW</span>
+                            ) : (
+                              <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">VALIDATED</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1238,13 +1205,13 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
                         >
                           👁️ Preview
                         </a>
-                        <button 
-                          onClick={() => triggerFileDownloadWithSavePicker(doc.id, doc.name)}
+                        <a 
+                          href={`/dashboard/documents/review?id=${doc.id}`}
                           className="px-2.5 py-1.5 bg-[#00f0ff]/10 hover:bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/20 text-[11px] font-bold rounded-lg transition-all"
-                          title="Download file"
+                          title="Verify document data"
                         >
-                          📥 Download
-                        </button>
+                          ✓ Verify Data
+                        </a>
                       </div>
                     </div>
                   ))}
