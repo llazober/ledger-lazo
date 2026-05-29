@@ -204,6 +204,15 @@ const maskSsnValue = (val: any): string => {
   return str;
 };
 
+const maskSensitiveData = (text: string): string => {
+  if (!text) return '';
+  // Mask SSNs in the format XXX-XX-XXXX or XXX XX XXXX
+  let masked = text.replace(/\b\d{3}[-\s]\d{2}[-\s](\d{4})\b/g, '***-**-$1');
+  // Mask raw 9-digit numbers that look like SSNs or EINs
+  masked = masked.replace(/\b\d{9}\b/g, (val) => `***-**-${val.slice(5)}`);
+  return masked;
+};
+
 async function triggerFolderDownloadAsZip(docIds: string[], docNames: string[], archiveName: string = 'documents.zip') {
   const zip = new JSZip();
 
@@ -416,7 +425,7 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   useEffect(() => {
     if (activeDoc) {
       setEditedCategory(activeDoc.category);
-      setEditedText(activeDoc.extractedText || '');
+      setEditedText(maskSensitiveData(activeDoc.extractedText || ''));
     } else {
       setEditedCategory('');
       setEditedText('');
