@@ -254,7 +254,14 @@ export default function CRMManager({ initialLeads, initialClients, initialStaff 
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  const pngDocs = consoleDocs.filter(doc => doc.fileType?.toUpperCase() === 'PNG' || doc.name.toLowerCase().endsWith('.png'));
+  const pngDocs = consoleDocs.filter(doc => {
+    const ft = (doc.fileType || '').toUpperCase();
+    const name = (doc.name || '').toLowerCase();
+    return ft === 'PNG' || name.endsWith('.png') ||
+           ft === 'JPG' || name.endsWith('.jpg') ||
+           ft === 'JPEG' || name.endsWith('.jpeg') ||
+           ft === 'WEBP' || name.endsWith('.webp');
+  });
 
   const handleOpenConsole = async (client: Client) => {
     setSelectedConsoleClient(client);
