@@ -187,7 +187,11 @@ export default function ReviewForm({ initialDoc }: ReviewFormProps) {
       
       // Delay navigation slightly to let the user see the success state
       setTimeout(() => {
-        router.push(`/dashboard/documents?selectedId=${initialDoc.id}`);
+        if (humanVerified) {
+          router.push('/dashboard/documents');
+        } else {
+          router.push(`/dashboard/documents?selectedId=${initialDoc.id}`);
+        }
         router.refresh();
       }, 1000);
 

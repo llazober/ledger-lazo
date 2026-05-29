@@ -399,9 +399,12 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
   const [docs, setDocs] = useState<Document[]>(initialDocs);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
-  const [activeDoc, setActiveDoc] = useState<Document | null>(initialDocs[0] || null);
+  const [activeDoc, setActiveDoc] = useState<Document | null>(() => {
+    return initialDocs.find(d => !d.humanVerified) || initialDocs[0] || null;
+  });
   const [selectedVaultDocs, setSelectedVaultDocs] = useState<string[]>([]);
   const [showPdfFiles, setShowPdfFiles] = useState(false);
+  const [showVerifiedDocs, setShowVerifiedDocs] = useState(false);
 
   const searchParams = useSearchParams();
   const selectedId = searchParams.get('selectedId');
@@ -713,6 +716,9 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     .filter(d => !selectedClientId || d.clientId === selectedClientId)
     .filter(d => showPdfFiles || !(d.name.toLowerCase().endsWith('.pdf') || d.fileType === 'PDF'));
 
+  const verifiedDocs = filteredDocs.filter(d => d.humanVerified);
+  const unverifiedDocs = filteredDocs.filter(d => !d.humanVerified);
+
   // Stats
   const totalDocs = filteredDocs.length;
   const processedDocs = filteredDocs.filter(d => d.status === 'VALIDATED').length;
@@ -988,6 +994,95 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
     }, 1000);
   };
 
+  const renderDocRow = (doc: Document) => {
+    return (
+      <div
+        key={doc.id}
+        onClick={() => setActiveDoc(doc)}
+        className={`p-4 flex justify-between items-center cursor-pointer transition-all hover:bg-white/[0.01] ${activeDoc?.id === doc.id ? 'bg-[#00f0ff]/5 border-l-2 border-[#00f0ff]' : ''
+          }`}
+      >
+        <div className="flex items-center gap-3 overflow-hidden pr-2 text-left">
+          <input
+            type="checkbox"
+            checked={selectedVaultDocs.includes(doc.id)}
+            onChange={(e) => {
+              e.stopPropagation();
+              handleToggleVaultDocSelection(doc.id);
+            }}
+            className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
+          />
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[8px] shrink-0 ${(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF')
+            ? 'bg-rose-500/10 text-rose-400'
+            : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
+              ? 'bg-blue-500/10 text-blue-400'
+              : 'bg-cyan-500/10 text-cyan-400'
+            }`}>
+            {(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF')
+              ? 'PDF'
+              : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
+                ? 'DOCX'
+                : doc.fileType.substring(0, 4).toUpperCase()}
+          </div>
+          <div className="overflow-hidden">
+            <div className="text-xs font-semibold text-white truncate">{doc.name}</div>
+            <div className="flex gap-2 items-center mt-1">
+              <span className="text-[9px] text-slate-500 font-medium">{(doc.fileSize / 1024).toFixed(1)} KB</span>
+              <span className="text-[8px] text-slate-600 font-black">•</span>
+              <span className="text-[9px] text-slate-400 font-semibold uppercase">{doc.category}</span>
+              {doc.humanVerified && (
+                <>
+                  <span className="text-[8px] text-slate-600 font-black">•</span>
+                  <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/10 uppercase tracking-wider text-[8px]">VERIFIED</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {doc.status === 'OCR_PROCESSING' ? (
+            <span className="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded animate-pulse">OCR SCANNING</span>
+          ) : doc.status === 'REVIEW_REQUIRED' ? (
+            <span className="text-[9px] text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/10">NEEDS REVIEW</span>
+          ) : (
+            <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">VALIDATED</span>
+          )}
+
+          <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={`/accounting/api/crm/document/download?docId=${doc.id}&preview=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all font-semibold"
+              title="Preview inline"
+            >
+              👁️
+            </a>
+            <button
+              onClick={() => triggerFileDownloadWithSavePicker(doc.id, doc.name)}
+              className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-[#00f0ff]/5 hover:bg-[#00f0ff]/15 px-2 py-1 rounded transition-all font-semibold"
+              title="Download file"
+            >
+              📥
+            </button>
+          </div>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteDoc(doc.id);
+            }}
+            className="text-[10px] text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded transition-all font-bold"
+            title="Delete Document"
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 md:p-8 space-y-6">
       {/* Header Info */}
@@ -1121,89 +1216,46 @@ export default function DocumentVault({ initialDocs, clients }: DocumentVaultPro
             </div>
 
             <div className="divide-y divide-white/5 overflow-y-auto max-h-[350px]">
-              {filteredDocs.map(doc => (
-                <div
-                  key={doc.id}
-                  onClick={() => setActiveDoc(doc)}
-                  className={`p-4 flex justify-between items-center cursor-pointer transition-all hover:bg-white/[0.01] ${activeDoc?.id === doc.id ? 'bg-[#00f0ff]/5 border-l-2 border-[#00f0ff]' : ''
-                    }`}
-                >
-                  <div className="flex items-center gap-3 overflow-hidden pr-2 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedVaultDocs.includes(doc.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleToggleVaultDocSelection(doc.id);
-                      }}
-                      className="w-3.5 h-3.5 rounded border-white/10 text-cyan-500 focus:ring-0 focus:ring-offset-0 bg-[#0f0f12] cursor-pointer shrink-0"
-                    />
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-[8px] shrink-0 ${(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF')
-                      ? 'bg-rose-500/10 text-rose-400'
-                      : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
-                        ? 'bg-blue-500/10 text-blue-400'
-                        : 'bg-cyan-500/10 text-cyan-400'
-                      }`}>
-                      {(doc.name.toLowerCase().endsWith('.pdf') || doc.fileType === 'PDF')
-                        ? 'PDF'
-                        : (doc.name.toLowerCase().endsWith('.docx') || doc.name.toLowerCase().endsWith('.doc'))
-                          ? 'DOCX'
-                          : doc.fileType.substring(0, 4).toUpperCase()}
+              {/* Human Verified Documents (Collapsible Section at the Top) */}
+              {verifiedDocs.length > 0 && (
+                <div className="bg-[#050b14]/60 border-b border-white/5">
+                  <button
+                    onClick={() => setShowVerifiedDocs(!showVerifiedDocs)}
+                    className="w-full flex justify-between items-center px-4 py-2.5 bg-emerald-500/[0.03] hover:bg-emerald-500/[0.06] transition-all select-none text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider">
+                        ✅ Human Verified ({verifiedDocs.length})
+                      </span>
                     </div>
-                    <div className="overflow-hidden">
-                      <div className="text-xs font-semibold text-white truncate">{doc.name}</div>
-                      <div className="flex gap-2 items-center mt-1">
-                        <span className="text-[9px] text-slate-500 font-medium">{(doc.fileSize / 1024).toFixed(1)} KB</span>
-                        <span className="text-[8px] text-slate-600 font-black">•</span>
-                        <span className="text-[9px] text-slate-400 font-semibold uppercase">{doc.category}</span>
-                      </div>
+                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                      {showVerifiedDocs ? 'Collapse ▴' : 'Expand ▾'}
+                    </span>
+                  </button>
+                  {showVerifiedDocs && (
+                    <div className="divide-y divide-white/5 bg-[#0a0f18]/30">
+                      {verifiedDocs.map(doc => renderDocRow(doc))}
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    {doc.status === 'OCR_PROCESSING' ? (
-                      <span className="text-[9px] text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded animate-pulse">OCR SCANNING</span>
-                    ) : doc.status === 'REVIEW_REQUIRED' ? (
-                      <span className="text-[9px] text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/10">NEEDS REVIEW</span>
-                    ) : (
-                      <span className="text-[9px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">VALIDATED</span>
-                    )}
-
-                    <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-                      <a
-                        href={`/accounting/api/crm/document/download?docId=${doc.id}&preview=true`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 px-2 py-1 rounded transition-all font-semibold"
-                        title="Preview inline"
-                      >
-                        👁️
-                      </a>
-                      <button
-                        onClick={() => triggerFileDownloadWithSavePicker(doc.id, doc.name)}
-                        className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-[#00f0ff]/5 hover:bg-[#00f0ff]/15 px-2 py-1 rounded transition-all font-semibold"
-                        title="Download file"
-                      >
-                        📥
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteDoc(doc.id);
-                      }}
-                      className="text-[10px] text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 p-1.5 rounded transition-all font-bold"
-                      title="Delete Document"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                  )}
                 </div>
-              ))}
-              {filteredDocs.length === 0 && (
+              )}
+
+              {/* Pending Queue Section Header */}
+              {unverifiedDocs.length > 0 && (
+                <div className="bg-slate-500/[0.02] px-4 py-2 text-[9px] font-black text-slate-400 uppercase tracking-wider border-b border-white/5">
+                  ⏳ Pending Verification Queue ({unverifiedDocs.length})
+                </div>
+              )}
+
+              {/* Unverified Documents (Main Queue) */}
+              {unverifiedDocs.map(doc => renderDocRow(doc))}
+
+              {/* Empty States */}
+              {unverifiedDocs.length === 0 && (
                 <div className="p-8 text-center text-slate-600 text-xs">
-                  No documents found for this client.
+                  {verifiedDocs.length > 0 
+                    ? "All uploaded documents have been human verified! 🎉"
+                    : "No documents found for this client."}
                 </div>
               )}
             </div>
